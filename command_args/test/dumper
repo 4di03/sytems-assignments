@@ -1,0 +1,39 @@
+# hide output of make adn run the program with the arguments passed to this script
+
+
+check_output(){
+    exit_status=$?
+    
+    if [ $exit_status -eq 0 ]; then
+        echo "Test Passed!"
+    else
+        echo "Test failed with error code $exit_status"
+    fi
+
+}
+
+run_test_case(){
+    echo "Running test case: $@"
+    out=$(./arger-palle $@)
+    echo "Program output: $out"
+    check_output $@
+}
+
+make
+
+run_test_case -u khRIS Middleton
+
+run_test_case -cap khRIS Middleton
+
+run_test_case -l khRIS Middleton
+
+run_test_case -u 
+
+run_test_case -cap 
+
+run_test_case -l
+
+run_test_case -u k
+
+run_test_case -cap HELLO WORLD :D
+

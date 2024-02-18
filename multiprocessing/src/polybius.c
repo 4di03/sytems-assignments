@@ -232,8 +232,8 @@ char *pbDecode(const char *ciphertext, table_t table)
         j++;
     }
 
-    plaintext[i] = '\0';
-    i++;
+    plaintext[j] = '\0';
+    j++;
 
     plaintext = realloc(plaintext, sizeof(char) * i);
 

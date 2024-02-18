@@ -11,7 +11,7 @@
 
 int main() {
   // builds and uses a process queue
-
+  printf("Running tests...\n");
   runAllTests();
   int n_processes = 5;
 

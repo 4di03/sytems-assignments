@@ -38,11 +38,15 @@ char* concat(const char* s1, const char* s2) {
   return result;
 }
 
-void runProgram(char* outputFolder, char* runName) {
+void runProgram(char* outputFolder, char* runName, int numStrings) {
   /**
    * Generate random strings and use several concurrent processes to parse these
    * strings in parallel. Args: outputFolder: The folder to save the output
    * files to. runName: The name of the run to save the output files to.
+   * args:
+   *  outputFolder: The folder to save the output files to.
+   * runName: The name of the run to save the output files to.
+   * numStrings: The number of random strings to generate.
    * returns:
    *  Outputs encrypted strings to the output folder specified by {outputFolder}
    * and the run name specified by {runName}.
@@ -53,7 +57,7 @@ void runProgram(char* outputFolder, char* runName) {
   char* fileLoc =
       concat(outputFolder, concat("/", concat(runName, "_RandomStrings.txt")));
 
-  generateRandomStrings(10000, 10, fileLoc);
+  generateRandomStrings(numStrings, 10, fileLoc);
 
   char* encryptedFileLoc = concat(
       outputFolder, concat("/", concat(runName, "_EncryptedStrings.txt")));

@@ -3,15 +3,16 @@
 #include "encrypter.h"
 #include "mp.h"
 #include "polybius.h"
+#include <fcntl.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/shm.h>
-#include <sys/types.h>
-#include <unistd.h>
 #include <string.h>
+#include <sys/shm.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <sys/wait.h>
-
+#include <unistd.h>
 int arrayLen(void** arr) {
   int i = 0;
   while (arr[i] != NULL) {
@@ -19,7 +20,6 @@ int arrayLen(void** arr) {
   }
   return i;
 }
-
 
 queue_t* readStringsFromFile(char* fileLoc) {
   /**
@@ -45,7 +45,6 @@ queue_t* readStringsFromFile(char* fileLoc) {
     line[i] = '\0';
     line = realloc(line, i * sizeof(char));
     add2SharedQ(queue, line);
-    
 
     while (curChar == '\n' || curChar == '\r') {
       curChar =
@@ -58,40 +57,40 @@ queue_t* readStringsFromFile(char* fileLoc) {
   return queue;
 }
 
+void write_to_pipe(FILE* stream, char* message) {
+  /**
+   * Writes output to the pipe.
+   * Args:
+   *  stream - file opening to write to
+   *  message - string message
+   *
+   * To give this funciton the ability to be called consectively on file
+   * descriptor streams, we do not open or close the file stream in this
+   * function and leave that up to the caller to handle.
+   * 
+   * This is thread-safe on unix systems as the write() function is atomic.
+   */
 
-void write_to_pipe (int file, char* message)
-{
-/**
- * Writes output to the pipe.
- * Args:
- *  file - pipe opening to write to
- *  message - string message
- */
-    
-  FILE* stream;
-  stream = fdopen(file, "w");
   if (stream == NULL) {
-      perror("fdopen");
-      exit(EXIT_FAILURE);
-    }
+    perror("fdopen");
+    exit(EXIT_FAILURE);
+  }
 
   fprintf(stream, "%s", message);
-  fclose (stream);
 }
-void encryptAndPipe(queue_t* queue, int pipe,
-                           pthread_mutex_t* sharedQueueMutex,
-                           pthread_mutex_t* sharedFileMutex, int stringsPerProcess) {
+void encryptAndPipe(queue_t* queue, int pipe, pthread_mutex_t* sharedQueueMutex,
+                    pthread_mutex_t* sharedFileMutex, int stringsPerProcess) {
   /**
    * Encrypts the strings in the queue {queue} and writes the encrypted strings
    * to the file at {fileLoc}. The strings in the queue are encrypted in
    * parallel.
    */
   // TODO
-
-  FILE* file = fdopen(pipe, "w");
-
+  
 
   int popped = 0;
+
+  FILE* stream = fdopen(pipe, "a");
   while (popped <= stringsPerProcess) {
     // lock queue with mutex
     pthread_mutex_lock(sharedQueueMutex);
@@ -112,19 +111,12 @@ void encryptAndPipe(queue_t* queue, int pipe,
 
     popped++;
 
-
-    // pipe string to file, no need for synchronization as we are using seperate pipes per process
-    write_to_pipe(pipe, strcat(encrypted, "\n"));
-
-
+    // pipe string to file, no need for synchronization as we are using seperate
+    // pipes per process
+    write_to_pipe(stream, strcat(encrypted, "\n"));
   }
-
-
+  fclose(stream);
 }
-
-
-
-
 
 void encryptStrings(char* fileLoc, char* encryptedFileLoc) {
   /**
@@ -134,11 +126,16 @@ void encryptStrings(char* fileLoc, char* encryptedFileLoc) {
    * Args:
    *   fileLoc: location of the file to read strings from
    *   encryptedFileLoc: location of the file to write encrypted strings to
-   *   stringsPerProcess: max number of strings to encrypt per process (10 child processes total), default = 100
+   *   stringsPerProcess: max number of strings to encrypt per process (10 child
+   * processes total), default = 100
    *
    * The encryption is run across multiple processes.
    */
-  // TODO
+
+  // clear the output file
+  FILE* f = fopen(encryptedFileLoc, "w");
+  fclose(f);
+
 
   int stringsPerProcess = 100; // can process a max of 10,000 strings
 
@@ -150,22 +147,22 @@ void encryptStrings(char* fileLoc, char* encryptedFileLoc) {
   pthread_mutex_t* sharedFileMutex = create_shared_mutex();
 
   // Create 10 child processes
-  int num_processes = 10;
+  int num_processes = 100;
   pid_t pid[num_processes];
-
 
   int outputPipe[num_processes][2];
   for (int i = 0; i < num_processes; i++) {
     if (pipe(outputPipe[i]) == -1) {
-        perror("pipe");
-        exit(EXIT_FAILURE);
+      perror("pipe");
+      exit(EXIT_FAILURE);
     }
+
+    int f = open(encryptedFileLoc, O_WRONLY | O_APPEND);
+    dup2(f, outputPipe[i][1]); // redirect write end of pipe to file
   }
 
-
-
   // Create 10 child processes
-  for (int i = 1; i <= num_processes; i++) {
+  for (int i = 0; i < num_processes; i++) {
     pid[i] = fork();
 
     if (pid[i] == -1) {
@@ -174,37 +171,20 @@ void encryptStrings(char* fileLoc, char* encryptedFileLoc) {
       exit(EXIT_FAILURE);
     } else if (pid[i] == 0) {
       // Child process
-      printf("Child process %d (PID: %d) created\n", i, getpid());
+      // printf("Child process %d (PID: %d) created\n", i, getpid());
 
       close(outputPipe[i][0]); // close read end of pipe
       encryptAndPipe(stringQueue, outputPipe[i][1], sharedQueueMutex,
-                            sharedFileMutex, stringsPerProcess);
+                     sharedFileMutex, stringsPerProcess);
 
       shmdt(stringQueue); // detach thsi progrces from shared memory
       // Child process terminates
       exit(EXIT_SUCCESS);
-    } else{
-        // Parent process
-
-        close(outputPipe[i][1]); // close write end of pipe
-
-        FILE* outputF = fopen(encryptedFileLoc, "w");
-        // read from pipe and write to file
-        FILE* stream = fdopen(outputPipe[i][0], "r");
-        char c;
-        // read the entire string from the pipe
-        while ((c = fgetc (stream)) != 0 && ! feof(stream)){
-            fputc(c, outputF);
-        }
-        fclose(outputF);
-
     }
   }
 
-
-
-   // Parent process waits for all child processes to terminate
-    for (int i = 1; i <= num_processes; i++) {
-        waitpid(pid[i], NULL, 0);     // wait for all child processes to terminate
-    }
+  // Parent process waits for all child processes to terminate
+  for (int i = 1; i <= num_processes; i++) {
+    waitpid(pid[i], NULL, 0); // wait for all child processes to terminate
+  }
 }

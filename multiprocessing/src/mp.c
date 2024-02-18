@@ -30,6 +30,9 @@ void clearAllSharedMemory() {
     }
 
     printf("Cleared all shared memory between ids %d and %d\n", shmid, last_shmid);
+    // reset the shmid values
+    shmid = 0;
+    last_shmid = 0; 
 }
 
 long getSharedMemoryLeft() {
@@ -144,6 +147,26 @@ pthread_mutex_t* create_shared_mutex() {
     pthread_mutexattr_init(&attr);
     pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
     pthread_mutex_init(mutex, &attr);
+    return mutex;
+}
+
+pthread_mutex_t* create_mutex(){
+    /**
+     * Creates a mutex  and returns a pointer to it.
+    */
+    pthread_mutex_t* mutex = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
+    if (mutex == NULL) {
+        perror("malloc");
+        exit(EXIT_FAILURE);
+    }
+
+    // Initialize the mutex
+    if (pthread_mutex_init(mutex, NULL) != 0) {
+        perror("pthread_mutex_init");
+        free(mutex); // Free memory allocated for mutex
+        exit(EXIT_FAILURE);
+    }
+
     return mutex;
 }
 

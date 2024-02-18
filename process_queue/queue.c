@@ -13,6 +13,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+
+
 void add2q(queue_t* queue, void* element) {
   /**
    * Adds one instance of an element to the end of the passed queue.
@@ -226,6 +228,8 @@ queue_t* initializeQueue() {
 
   return queue;
 }
+
+
 
 void runAllTests() {
   /**

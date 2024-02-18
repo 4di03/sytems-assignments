@@ -1,7 +1,8 @@
 
 #include "queue.h"
+#include <stdio.h>
 
-void write_to_pipe(int file, char* message);
+void write_to_pipe(FILE* stream, char* message);
 
 queue_t* readStringsFromFile(char* fileLoc);
 

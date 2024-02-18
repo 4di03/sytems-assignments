@@ -4,12 +4,18 @@
 #include <assert.h>
 #include <string.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <fcntl.h>
 #include "src/randomStringGen.h"
 #include "src/queue.h"
 #include "src/encrypter.h"
 #include "src/program.h"
 #include "src/polybius.h"
+#include "src/mp.h"
 #include <unistd.h>
+#include <pthread.h>
+#include <sys/shm.h>
 
 char* getCWD() {
     char* cwd = NULL;
@@ -71,60 +77,179 @@ void testRandomString(){
 
 
 void testPipe(){
+
+    char* outputFP = "outputs/test_pipe.txt";
+    // clear the file
+    FILE* file = fopen(outputFP, "w");
+    fclose(file);
+
+    int numChildren = 100;
+    int dup = 100;// number of times to duplicate the message
     printf("Testing pipe...\n");
-    int pipe_fd[2];
-    pid_t pid;
+    int pipe_fd[numChildren][2];
+    pid_t pid[numChildren];
     char message[] = "Hello from parent!\n";
 
-    // Create a pipe
-    if (pipe(pipe_fd) == -1) {
-        perror("pipe");
-        exit(EXIT_FAILURE);
+    for (int i = 0; i < numChildren; i++){
+        // Create a pipe
+        if (pipe(pipe_fd[i]) == -1) {
+            perror("pipe");
+            exit(EXIT_FAILURE);
+        }
+
+        // redirect write end of pipe to file
+        int f = open(outputFP, O_WRONLY | O_APPEND);
+        dup2(f, pipe_fd[i][1]);
+
+    }
+    pthread_mutex_t* fileMutex = create_mutex();
+
+    for (int i = 0; i < numChildren; i++){
+        // Fork a child process
+        pid[i]= fork();
+        if (pid[i] == -1) {
+            perror("fork");
+            exit(EXIT_FAILURE);
+        } else if (pid[i] == 0) {
+            // Child process
+            char message[50];
+            FILE* stream = fdopen(pipe_fd[i][1], "a");
+            for (int j = 0; j < dup; j++){
+
+                //printf("Child %d writing to pipe for %dth time\n", i,j);
+                sprintf(message, "Hello from child %d , v%d!\n", i,j);
+                write_to_pipe(stream, message);
+            }
+
+            fclose(stream);
+
+            exit(EXIT_SUCCESS);
+        } 
     }
 
-    // Fork a child process
-    pid = fork();
-    if (pid == -1) {
-        perror("fork");
-        exit(EXIT_FAILURE);
-    } else if (pid == 0) {
-        // Child process
-        close(pipe_fd[0]); // Close read end of pipe in child
-        write_to_pipe(pipe_fd[1], "Hello from child!\n");
-        exit(EXIT_SUCCESS);
-    } else {
-        // Parent process
-        FILE* stream = fdopen(pipe_fd[0], "r");
-        FILE* outputF = fopen("outputs/test_pipe.txt", "w");
+    // wait for all children to finish
+    for (int i = 0; i < numChildren; i++){
+        waitpid(pid[i], NULL, 0);     // wait for all child processes to terminate
+    }
 
-        close(pipe_fd[1]); // Close write end of pipe in parent
-        char c;
-        // read the entire string from the pipe
-        while ((c = fgetc (stream)) != 0 && ! feof(stream)){
-            fputc(c, outputF);
+    file = fopen(outputFP, "r");
+    char* line = malloc(50 * sizeof(char));
+    size_t len = 0;
+    for (int i = 0; i < numChildren * dup; i++){
+        getline(&line, &len, file);
+        char expected[50];
+
+        assert(strlen(line) >= strlen("Hello from child 0 , v0!\n"));
+        if (feof(file)){
+            if (i < numChildren * dup - 1){
+                printf("Error: file ended prematurely\n");
+                exit(1);
+            }
+            break;
         }
-        fclose(outputF);
     }
 
     printf("Pipe tests passed!\n");
 }
 
 
+char** stringQueueToArray(queue_t* queue){
+    char** arr = malloc(queue->size * sizeof(char*));
+    int i = 0;
+    while (queue->size > 0){
+        arr[i++] = (char*)popQ(queue);
+    }
+    return arr;
+}
+
+int cipher_strcmp(char* str1, char* str2){
+    /**
+     * Compares two strings and returns 1 if they are equal and 0 if they are not.
+     * This function is used to compare strings that are encoded using the polybius cipher.
+     * i and j are considered equal in the comparison.
+    */
+    
+    int i =0;
+    while (str1[i] != '\0'){
+        if( str1[i] == str2[i] ||(str1[i] == 'i' && str2[i] == 'j') || (str1[i] == 'j' && str2[i] == 'i')){
+            i++;
+        }else{
+            return 0;
+        }
+
+    }
+
+    return (str2[i] == '\0');
+}
+
+int inArray(char* str, char** arr){
+
+    int i = 0;
+
+    while (arr[i] != NULL){ // keep going until we reach the end of the array
+        if (cipher_strcmp(arr[i], str) == 1){
+            return 1;
+        }
+        i++;
+    }
+    return 0;
+}
+
+void testCiphers(){  
+    printf("Testing ciphers...\n");
+    char** randStrings = generateRandomStringsInMemory(100, 5);
+
+    for (int i = 0; i < 10; i++){
+        char* encrypted = pbEncode(randStrings[i], shuffledTable);
+        char* decrypted = pbDecode(encrypted, shuffledTable);
+        assert(cipher_strcmp(pbDecode(encrypted, shuffledTable), decrypted) == 1);
+        assert(cipher_strcmp(pbEncode(decrypted, shuffledTable), encrypted) == 1);
+    }
+
+
+    assert(cipher_strcmp(pbDecode("51413111", shuffledTable) , "upkf") == 1);
+    printf("Cipher tests passed!\n");
+}
+
+
+void validateFiles(char* stringsFile, char* encryptedFile, int numStrings){
+
+    queue_t* queue = readStringsFromFile(encryptedFile);
+    queue_t* origQueue = readStringsFromFile(stringsFile);
+
+    
+    assert(qsize(queue) == numStrings);
+    assert(qsize(origQueue) == qsize(queue));
+    char** origStrings = stringQueueToArray(origQueue);
+    char** encryptedStrings = stringQueueToArray(queue);
+
+    // detach from shared memory
+    shmdt(queue); 
+    shmdt(origQueue);
+
+
+    for(int i = 0; i < numStrings; i++){
+        char* encrypted = encryptedStrings[i];
+        char* orig = origStrings[i];
+
+
+        assert(inArray(pbEncode(orig, shuffledTable), encryptedStrings) == 1); // check that all original strings are present in the encrypted strings
+
+        assert(inArray(pbDecode(encrypted, shuffledTable), origStrings) == 1); // check that all encrypted strings are present in the original strings
+    }
+
+}
+
+
 void testEncrypt(){
     printf("Testing encryption...\n");
+
+    int numStrings = 10;
     
-    generateRandomStrings(10000,4, "outputs/test_save_large.txt");
+    generateRandomStrings(numStrings,4, "outputs/test_save_large.txt");
     encryptStrings("outputs/test_save_large.txt", "outputs/test_encrypted.txt");
 
-    queue_t* queue = readStringsFromFile("outputs/test_encrypted.txt");
-    queue_t* origQueue = readStringsFromFile("outputs/test_save_large.txt");
-    assert(qsize(queue) == 10000);
-    while(queue->size > 0){
-        char* curString = (char*)popQ(queue);
-        char* origString = (char*)popQ(origQueue);
-        assert(strlen(curString) == 4);
-        assert(pbDecode(curString, shuffledTable) == origString);
-    }
+    validateFiles("outputs/test_save_large.txt", "outputs/test_encrypted.txt", numStrings);
 
     printf("Encryption tests passed!\n");
 
@@ -136,7 +261,13 @@ void testEncrypt(){
 void integrationTest(){
     printf("Running integration test...\n");
 
-    runProgram("outputs", "test_run");
+    int numStrings = 100;
+    runProgram("outputs", "test_run", numStrings);
+
+    char* randomStringsFile = "outputs/test_run_RandomStrings.txt";
+    char* encryptedStringsFile = "outputs/test_run_EncryptedStrings.txt";
+
+    validateFiles(randomStringsFile, encryptedStringsFile, numStrings);
 
 
     printf("Integration test passed!\n");
@@ -155,9 +286,16 @@ void runTests(){
 
     testPipe();
 
+    testCiphers();
+
+    clearAllSharedMemory(); // clear all shared memory before running further tests
+    
     testEncrypt();
+    clearAllSharedMemory(); // clear all shared memory before running further tests
 
     integrationTest();
+
+    clearAllSharedMemory(); // clear all shared memory before running further tests
 
     printf("All tests passed!\n ");
 }
@@ -167,5 +305,5 @@ void runTests(){
 int main(){
     runTests();
     return 0;
-}
+}//
 

@@ -6,6 +6,7 @@
  *
  */
 #include "src/program.h"
+#include "src/mp.h"
 #include <stdio.h>
 
 int main(int argc, char* argv[]) {
@@ -14,7 +15,9 @@ int main(int argc, char* argv[]) {
     printf("Must provide a run name for file saving!\n");
     return 1;
   } else {
-  runProgram("outputs", argv[1]);
+  runProgram("outputs", argv[1], 10000);
+  clearAllSharedMemory(); // clear all shared memory before running further tests
+
   return 0;
   }
 }

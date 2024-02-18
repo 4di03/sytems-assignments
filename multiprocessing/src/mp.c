@@ -25,11 +25,11 @@ void clearAllSharedMemory() {
 
     for (int i = shmid; i <= last_shmid; i++) {
         if (shmctl(i, IPC_RMID, NULL) == -1){
-            printf("Failed to clear shared memory with shmid: %d\n", i);
+            //printf("Failed to clear shared memory with shmid: %d\n", i);
         }
     }
 
-    printf("Cleared all shared memory between ids %d and %d\n", shmid, last_shmid);
+    //printf("Cleared all shared memory between ids %d and %d\n", shmid, last_shmid);
     // reset the shmid values
     shmid = 0;
     last_shmid = 0; 

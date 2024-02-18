@@ -55,13 +55,20 @@ void testRandomString(){
     char* rand = randomString(10);
 
     for (int i = 0; i < 10; i++){
-        assert(rand[i] >= 97 && rand[i] <= 122);
+        assert(rand[i] >= 97 && rand[i] <= 123 || rand[i] == 33 || rand[i] == 63 || rand[i] == 46); // check that the string is alphabetic or contains termination markers
     }
 
-    char** randomStrings = generateRandomStringsInMemory(10, 5);
+    char** randomStrings = generateRandomStringsInMemory(100, 5);
+    int allEqual = 1;
     for (int i = 0; i < 10; i++){
         assert(strlen(randomStrings[i]) == 5);
+        if (i > 0){
+        allEqual = allEqual && (strcmp(randomStrings[i-1], randomStrings[i]) == 0);
+        }
+
     }
+
+    assert(allEqual == 0); // check that the strings are not all equal
 
 
     generateRandomStrings(10, 9, "outputs/test.txt");
@@ -170,8 +177,14 @@ int cipher_strcmp(char* str1, char* str2){
     */
     
     int i =0;
+
     while (str1[i] != '\0'){
-        if( str1[i] == str2[i] ||(str1[i] == 'i' && str2[i] == 'j') || (str1[i] == 'j' && str2[i] == 'i')){
+        
+        char cur_str2 = lowercase(str2[i]);
+        char cur_str1 = lowercase(str1[i]);
+        
+
+        if( cur_str1 == cur_str2 || (cur_str1== 'i' && cur_str2 == 'j') || (cur_str1 == 'j' && cur_str2 == 'i')){
             i++;
         }else{
             return 0;
@@ -206,6 +219,13 @@ void testCiphers(){
         assert(cipher_strcmp(pbEncode(decrypted, shuffledTable), encrypted) == 1);
     }
 
+    free(randStrings); // free the memory allocated for the random strings
+
+    // test case where non alphabetic characters are present
+    assert(cipher_strcmp(pbDecode(pbEncode("hello~world!", shuffledTable), shuffledTable) , "hello~world!") == 1);
+
+    //test case where only alphabetic characters are present
+    assert(cipher_strcmp(pbDecode(pbEncode("hello", shuffledTable) , shuffledTable), "hello") == 1);
 
     assert(cipher_strcmp(pbDecode("51413111", shuffledTable) , "upkf") == 1);
     printf("Cipher tests passed!\n");
@@ -256,17 +276,31 @@ void testEncrypt(){
 }
 
 
-
-
 void integrationTest(){
     printf("Running integration test...\n");
 
-    int numStrings = 100;
+    // test generating 100 random strings and encrypting them
+    int numStrings = 5000;
     runProgram("outputs", "test_run", numStrings);
 
     char* randomStringsFile = "outputs/test_run_RandomStrings.txt";
     char* encryptedStringsFile = "outputs/test_run_EncryptedStrings.txt";
 
+    validateFiles(randomStringsFile, encryptedStringsFile, numStrings);
+
+    // test the empty file case
+    numStrings = 0; 
+    runProgram("outputs", "test_empty", numStrings);
+    randomStringsFile = "outputs/test_empty_RandomStrings.txt";
+    encryptedStringsFile = "outputs/test_empty_EncryptedStrings.txt";
+
+    validateFiles(randomStringsFile, encryptedStringsFile, numStrings);
+
+    // test teh odd num strings case
+    numStrings = 1023;
+    runProgram("outputs", "test_odd", numStrings);
+    randomStringsFile = "outputs/test_odd_RandomStrings.txt";
+    encryptedStringsFile = "outputs/test_odd_EncryptedStrings.txt";
     validateFiles(randomStringsFile, encryptedStringsFile, numStrings);
 
 
@@ -279,6 +313,12 @@ void runTests(){
      * Runs all the tests for all programs in this codebase.
     */
     printf("Running tests...\n");
+
+    integrationTest(); // run this first because it creates output folder
+
+    clearAllSharedMemory(); // clear all shared memory before running further tests
+
+    printf("Running unit tests...\n");
     //TODO : write the test cases
     testRandomString();
 
@@ -293,14 +333,10 @@ void runTests(){
     testEncrypt();
     clearAllSharedMemory(); // clear all shared memory before running further tests
 
-    integrationTest();
-
-    clearAllSharedMemory(); // clear all shared memory before running further tests
+    printf("Unit tests passed!\n");
 
     printf("All tests passed!\n ");
 }
-
-
 
 int main(){
     runTests();

@@ -28,6 +28,7 @@ static table_t shuffledTable = {{{'f', 'x', 'a', 'm', 'c'},
                                  {'p', 'q', 'w', 's', 't'},
                                  {'u', 'v', 'r', 'l', 'z'}}}; // default table for polybius cipher
 
+char lowercase(char c);
 
 int charToInt(char digitChar);
 

@@ -5,6 +5,10 @@
  * Spring 2024 / Jan 27, 2024
  *
  */
+#ifndef QUEUE_H
+#define QUEUE_H
+#pragma once
+
 
 typedef struct node_t {
   /**
@@ -21,6 +25,7 @@ typedef struct node_t {
 typedef struct queue_t {
   node_t* frontNode; // sentinel node at the front of the queue
   node_t* backNode;  // sentinel node at the end of the queue
+  int size;
 
 } queue_t;
 
@@ -36,4 +41,5 @@ char* genRandString();
 
 
 queue_t* initializeQueue();
-
+queue_t* initializeSharedQueue();
+#endif

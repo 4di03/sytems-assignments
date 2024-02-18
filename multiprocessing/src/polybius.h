@@ -21,6 +21,14 @@ typedef struct table_t
 
 } table_t;
 
+
+static table_t shuffledTable = {{{'f', 'x', 'a', 'm', 'c'},
+                                 {'i', 'd', 'b', 'g', 'e'},
+                                 {'k', 'y', 'h', 'n', 'o'},
+                                 {'p', 'q', 'w', 's', 't'},
+                                 {'u', 'v', 'r', 'l', 'z'}}}; // default table for polybius cipher
+
+
 int charToInt(char digitChar);
 
 char intToChar(int n);

@@ -7,7 +7,6 @@
  */
 
 #include "queue.h"
-
 #include <assert.h>
 #include <limits.h>
 #include <stdio.h>
@@ -33,6 +32,8 @@ void add2q(queue_t* queue, void* element) {
   // Update the pointers in the existing nodes
   queue->backNode->leftNeighbor->rightNeighbor = newNode;
   queue->backNode->leftNeighbor = newNode;
+
+  queue->size += 1;
 }
 
 void* removeNodeWithinQueue(node_t* node) {
@@ -51,6 +52,7 @@ void* removeNodeWithinQueue(node_t* node) {
   // deteach node
   node->leftNeighbor = 0;
   node->rightNeighbor = 0;
+  
 }
 
 void* popQ(queue_t* queue) {
@@ -63,6 +65,7 @@ void* popQ(queue_t* queue) {
 
   if (frontNode != 0) {
     removeNodeWithinQueue(frontNode);
+    queue->size -= 1;
     return frontNode->data;
   } else {
     printf("Queue is empty\n");
@@ -76,13 +79,14 @@ int qsize(queue_t* queue) {
    *
    */
 
-  node_t* node = queue->frontNode->rightNeighbor;
-  int size = 0;
-  while (node->isSentinel != 1) {
-    size++;
-    node = node->rightNeighbor;
-  }
-  return size;
+  // node_t* node = queue->frontNode->rightNeighbor;
+  // int size = 0;
+  // while (node->isSentinel != 1) {
+  //   size++;
+  //   node = node->rightNeighbor;
+  // }
+  // return size;
+  return queue->size;
 }
 
 

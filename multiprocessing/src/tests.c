@@ -5,8 +5,10 @@
 #include <string.h>
 #include "tests.h"
 #include "randomStringGen.h"
+#include "queue.h"
 #include "encrypter.h"
-
+#include "program.h"
+#include "polybius.h"
 
 void testReadStringFromFile(){
     printf("Testing reading strings from file...\n");
@@ -50,6 +52,38 @@ void testRandomString(){
     printf("Random string generation tests passed!\n");
 }
 
+
+void testEncrypt(){
+    printf("Testing encryption...\n");
+    
+    generateRandomStrings(10000,4, "outputs/test_save_large.txt");
+    encryptStrings("outputs/test_save_large.txt", "outputs/test_encrypted.txt");
+
+    queue_t* queue = readStringsFromFile("outputs/test_encrypted.txt");
+    queue_t* origQueue = readStringsFromFile("outputs/test_save_large.txt");
+    assert(qsize(queue) == 10000);
+    while(queue->size > 0){
+        char* curString = (char*)popQ(queue);
+        char* origString = (char*)popQ(origQueue);
+        assert(strlen(curString) == 4);
+        assert(pbDecode(curString, shuffledTable) == origString);
+    }
+
+    printf("Encryption tests passed!\n");
+
+}
+
+
+void integrationTest(){
+    printf("Running integration test...\n");
+
+    runProgram("outputs", "test_run");
+
+
+    printf("Integration test passed!\n");
+}
+
+
 void runTests(){
     /**
      * Runs all the tests for all programs in this codebase.
@@ -59,6 +93,11 @@ void runTests(){
     testRandomString();
 
     testReadStringFromFile();
+
+
+    testEncrypt();
+
+    integrationTest();
 
     printf("All tests passed!\n ");
 }

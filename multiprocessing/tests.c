@@ -3,18 +3,38 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
-#include "tests.h"
-#include "randomStringGen.h"
-#include "queue.h"
-#include "encrypter.h"
-#include "program.h"
-#include "polybius.h"
+#include <sys/types.h>
+#include "src/randomStringGen.h"
+#include "src/queue.h"
+#include "src/encrypter.h"
+#include "src/program.h"
+#include "src/polybius.h"
+#include <unistd.h>
+
+char* getCWD() {
+    char* cwd = NULL;
+    long size = pathconf(".", _PC_PATH_MAX);
+
+    if ((cwd = (char *)malloc((size_t)size)) != NULL) {
+        if (getcwd(cwd, (size_t)size) == NULL) {
+            perror("getcwd() error");
+            free(cwd);
+            return NULL;
+        }
+    } else {
+        perror("malloc() error");
+        return NULL;
+    }
+
+    return cwd;
+}
 
 void testReadStringFromFile(){
     printf("Testing reading strings from file...\n");
     FILE* file = fopen("outputs/test_read.txt", "w");
     fprintf(file, "hello\nworld\n");
     fclose(file);
+
     queue_t* queue = readStringsFromFile("outputs/test_read.txt");
     assert(qsize(queue) == 2);
     assert(strcmp((char*)queue->frontNode->rightNeighbor->data, "hello") == 0);
@@ -24,10 +44,7 @@ void testReadStringFromFile(){
 
 
 void testRandomString(){
-    printf("Testing random string generation...\n");
-
-
-    
+    printf("Testing random string generation...\n");    
 
     char* rand = randomString(10);
 
@@ -53,6 +70,46 @@ void testRandomString(){
 }
 
 
+void testPipe(){
+    printf("Testing pipe...\n");
+    int pipe_fd[2];
+    pid_t pid;
+    char message[] = "Hello from parent!\n";
+
+    // Create a pipe
+    if (pipe(pipe_fd) == -1) {
+        perror("pipe");
+        exit(EXIT_FAILURE);
+    }
+
+    // Fork a child process
+    pid = fork();
+    if (pid == -1) {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    } else if (pid == 0) {
+        // Child process
+        close(pipe_fd[0]); // Close read end of pipe in child
+        write_to_pipe(pipe_fd[1], "Hello from child!\n");
+        exit(EXIT_SUCCESS);
+    } else {
+        // Parent process
+        FILE* stream = fdopen(pipe_fd[0], "r");
+        FILE* outputF = fopen("outputs/test_pipe.txt", "w");
+
+        close(pipe_fd[1]); // Close write end of pipe in parent
+        char c;
+        // read the entire string from the pipe
+        while ((c = fgetc (stream)) != 0 && ! feof(stream)){
+            fputc(c, outputF);
+        }
+        fclose(outputF);
+    }
+
+    printf("Pipe tests passed!\n");
+}
+
+
 void testEncrypt(){
     printf("Testing encryption...\n");
     
@@ -72,6 +129,8 @@ void testEncrypt(){
     printf("Encryption tests passed!\n");
 
 }
+
+
 
 
 void integrationTest(){
@@ -94,6 +153,7 @@ void runTests(){
 
     testReadStringFromFile();
 
+    testPipe();
 
     testEncrypt();
 

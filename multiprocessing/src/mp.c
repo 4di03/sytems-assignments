@@ -12,18 +12,76 @@
 #include <unistd.h>
 #include <sched.h>
 #include "mp.h"
+#define max(a, b) ((a) > (b) ? (a) : (b))
+
+static int first_shmid = 0;
+static int last_shmid = 0;
+
+void clearAllSharedMemory() {
+    int shmid = first_shmid;
+    if (shmid == 0 || last_shmid == 0) {
+        return; // this means no shared memory was allocated
+    }
+
+    for (int i = shmid; i <= last_shmid; i++) {
+        if (shmctl(i, IPC_RMID, NULL) == -1){
+            printf("Failed to clear shared memory with shmid: %d\n", i);
+        }
+    }
+
+    printf("Cleared all shared memory between ids %d and %d\n", shmid, last_shmid);
+}
+
+long getSharedMemoryLeft() {
+    int shmid;
+    struct shminfo shm_info;
+    long totalSize, usedSize;
+
+    // Get the current shared memory ID
+    if ((shmid = shmget(IPC_PRIVATE, 1, IPC_CREAT | 0666)) == -1) {
+        perror("shmget");
+        exit(EXIT_FAILURE);
+    }
+
+    // Get information about shared memory
+    if (shmctl(shmid, IPC_INFO, (struct shmid_ds *)&shm_info) == -1) {
+        perror("shmctl");
+        exit(EXIT_FAILURE);
+    }
+
+    // Calculate total and used shared memory size
+    totalSize = shm_info.shmall * shm_info.shmmax;
+    usedSize = shm_info.shmseg * shm_info.shmmax;
+
+    // Clean up: remove the shared memory segment
+    if (shmctl(shmid, IPC_RMID, NULL) == -1) {
+        perror("shmctl");
+        exit(EXIT_FAILURE);
+    }
+
+    // Calculate and return the amount of shared memory left
+    return totalSize - usedSize;
+}
 
 void* allocate_shared_mem(int size) {
     /**
      * creates a a pointer to {size} bytes of data in shared memory and returns the pointer.
     */
     int shm_id = shmget(IPC_PRIVATE, size, IPC_CREAT | 0666);
+
     if (shm_id == -1) {
+        clearAllSharedMemory(); // clears all shared memory before exiting
         perror("shmget");
         exit(1);
+    } else if (first_shmid == 0) {
+        first_shmid = shm_id; // storing the first shmid to clear all shared memory later
     }
+    last_shmid = max(last_shmid, shm_id); // storing the last shmid to clear all shared memory later
+
+   
     void* shm_ptr = shmat(shm_id, NULL, 0);
     if (shm_ptr == (void*) -1) {
+        clearAllSharedMemory(); // clears all shared memory before exiting
         perror("shmat");
         exit(1);
     }

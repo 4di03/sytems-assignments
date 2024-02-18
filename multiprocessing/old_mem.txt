@@ -1,0 +1,18 @@
+
+------ Message Queues --------
+key        msqid      owner      perms      used-bytes   messages    
+
+------ Shared Memory Segments --------
+key        shmid      owner      perms      bytes      nattch     status      
+0x00000000 5          parallels  600        524288     2          dest         
+0x00000000 8          parallels  600        98304      2          dest         
+0x00000000 9          parallels  600        98304      2          dest         
+
+------ Semaphore Arrays --------
+key        semid      owner      perms      nsems     
+0xd20204f4 0          root       666        1         
+0xd30204f4 1          root       666        1         
+0xd40204f4 2          root       666        1         
+0xd2020509 3          root       666        1         
+0xd2020502 4          root       666        1         
+

@@ -1,6 +1,8 @@
 #include "queue.h"
 #include <pthread.h>
 
+long getSharedMemoryLeft();
+
 void* allocate_shared_mem(int size);
 
 

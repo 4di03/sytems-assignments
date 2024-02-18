@@ -10,7 +10,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <string.h>
-
+#include <sys/wait.h>
 
 int arrayLen(void** arr) {
   int i = 0;
@@ -20,20 +20,6 @@ int arrayLen(void** arr) {
   return i;
 }
 
-// char** encrypt(char** word) {
-//   /**
-//    * Encrypts the words in the array {word} and returns the encrypted words in a
-//    * new array.
-//    */
-
-//   int numWords = arrayLen((void**)word);
-
-//   char** encrypted = malloc(sizeof(char*) * numWords);
-//   for (int i = 0; i < 10; i++) {
-//     encrypted[i] = pbEncode(word[i], shuffledTable);
-//   }
-//   return encrypted;
-// }
 
 queue_t* readStringsFromFile(char* fileLoc) {
   /**
@@ -59,6 +45,7 @@ queue_t* readStringsFromFile(char* fileLoc) {
     line[i] = '\0';
     line = realloc(line, i * sizeof(char));
     add2SharedQ(queue, line);
+    
 
     while (curChar == '\n' || curChar == '\r') {
       curChar =
@@ -82,8 +69,13 @@ void write_to_pipe (int file, char* message)
  */
     
   FILE* stream;
-  stream = fdopen (file, "w");
-  fprintf (stream, message);
+  stream = fdopen(file, "w");
+  if (stream == NULL) {
+      perror("fdopen");
+      exit(EXIT_FAILURE);
+    }
+
+  fprintf(stream, "%s", message);
   fclose (stream);
 }
 void encryptAndPipe(queue_t* queue, int pipe,
@@ -154,19 +146,6 @@ void encryptStrings(char* fileLoc, char* encryptedFileLoc) {
 
   int numWords = qsize(stringQueue);
 
-  // move queue to shared memory
-
-  int shm_id = shmget(IPC_PRIVATE, sizeof(queue_t), IPC_CREAT | 0666);
-  if (shm_id == -1) {
-    perror("shmget");
-    exit(EXIT_FAILURE);
-  }
-  void* shm_ptr = shmat(shm_id, NULL, 0);
-  if (shm_ptr == (void*)-1) {
-    perror("shmat");
-    exit(EXIT_FAILURE);
-  }
-
   pthread_mutex_t* sharedQueueMutex = create_shared_mutex();
   pthread_mutex_t* sharedFileMutex = create_shared_mutex();
 
@@ -201,6 +180,7 @@ void encryptStrings(char* fileLoc, char* encryptedFileLoc) {
       encryptAndPipe(stringQueue, outputPipe[i][1], sharedQueueMutex,
                             sharedFileMutex, stringsPerProcess);
 
+      shmdt(stringQueue); // detach thsi progrces from shared memory
       // Child process terminates
       exit(EXIT_SUCCESS);
     } else{
@@ -210,18 +190,18 @@ void encryptStrings(char* fileLoc, char* encryptedFileLoc) {
 
         FILE* outputF = fopen(encryptedFileLoc, "w");
         // read from pipe and write to file
-        char* buffer[100];
         FILE* stream = fdopen(outputPipe[i][0], "r");
-        int c;
-        // read teh entire string from the pipe
-        while ((c = fgetc (stream)) != EOF){
+        char c;
+        // read the entire string from the pipe
+        while ((c = fgetc (stream)) != 0 && ! feof(stream)){
             fputc(c, outputF);
         }
         fclose(outputF);
 
-
     }
   }
+
+
 
    // Parent process waits for all child processes to terminate
     for (int i = 1; i <= num_processes; i++) {

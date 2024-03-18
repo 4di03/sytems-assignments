@@ -1,5 +1,9 @@
 Multiprocessing in C
 
+NOTE: please run 
+```sudo sysctl -w kernel.shmmni=32000```
+before running any of the below commands. This increases the max number of shared memory segments to 32000, allowing use to build queues with up to 32000 elements.
+
 In this code, we generate random strings and use several concurrent processes to encrypt these strings in parallel and save the results to an outputfile.
 
 To run the code, simply run 

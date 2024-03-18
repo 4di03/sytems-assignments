@@ -14,6 +14,8 @@
 #include "mp.h"
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
+
+// test comment
 static int first_shmid = 0;
 static int last_shmid = 0;
 

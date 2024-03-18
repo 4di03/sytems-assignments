@@ -1,0 +1,92 @@
+The code was modified to shrink the buffer rather than just updating the index when consuming for better visualization.
+Produced 1 at index 0:
+Buffer:
+[1 0 0 0 0 0 0 0 0 0 ]
+Consumed 1 at index 0:
+Buffer:
+[0 0 0 0 0 0 0 0 0 0 ]
+Produced 1 at index 0:
+Buffer:
+[1 0 0 0 0 0 0 0 0 0 ]
+Produced 4 at index 1:
+Buffer:
+[1 4 0 0 0 0 0 0 0 0 ]
+Consumed 4 at index 1:
+Buffer:
+[1 0 0 0 0 0 0 0 0 0 ]
+Produced 4 at index 1:
+Buffer:
+[1 4 0 0 0 0 0 0 0 0 ]
+Produced 9 at index 2:
+Buffer:
+[1 4 9 0 0 0 0 0 0 0 ]
+Produced 16 at index 3:
+Buffer:
+[1 4 9 16 0 0 0 0 0 0 ]
+Consumed 16 at index 3:
+Buffer:
+[1 4 9 0 0 0 0 0 0 0 ]
+Produced 16 at index 3:
+Buffer:
+[1 4 9 16 0 0 0 0 0 0 ]
+Produced 25 at index 4:
+Buffer:
+[1 4 9 16 25 0 0 0 0 0 ]
+Produced 36 at index 5:
+Buffer:
+[1 4 9 16 25 36 0 0 0 0 ]
+Consumed 36 at index 5:
+Buffer:
+[1 4 9 16 25 0 0 0 0 0 ]
+Produced 36 at index 5:
+Buffer:
+[1 4 9 16 25 36 0 0 0 0 ]
+Produced 49 at index 6:
+Buffer:
+[1 4 9 16 25 36 49 0 0 0 ]
+Produced 64 at index 7:
+Buffer:
+[1 4 9 16 25 36 49 64 0 0 ]
+Consumed 64 at index 7:
+Buffer:
+[1 4 9 16 25 36 49 0 0 0 ]
+Produced 64 at index 7:
+Buffer:
+[1 4 9 16 25 36 49 64 0 0 ]
+Produced 81 at index 8:
+Buffer:
+[1 4 9 16 25 36 49 64 81 0 ]
+Produced 100 at index 9:
+Buffer:
+[1 4 9 16 25 36 49 64 81 100 ]
+Consumed 100 at index 9:
+Buffer:
+[1 4 9 16 25 36 49 64 81 0 ]
+Produced 100 at index 9:
+Buffer:
+[1 4 9 16 25 36 49 64 81 100 ]
+Consumed 100 at index 9:
+Buffer:
+[1 4 9 16 25 36 49 64 81 0 ]
+Produced 100 at index 9:
+Buffer:
+[1 4 9 16 25 36 49 64 81 100 ]
+Consumed 100 at index 9:
+Buffer:
+[1 4 9 16 25 36 49 64 81 0 ]
+Produced 100 at index 9:
+Buffer:
+[1 4 9 16 25 36 49 64 81 100 ]
+Consumed 100 at index 9:
+Buffer:
+[1 4 9 16 25 36 49 64 81 0 ]
+Produced 100 at index 9:
+Buffer:
+[1 4 9 16 25 36 49 64 81 100 ]
+Consumed 100 at index 9:
+Buffer:
+[1 4 9 16 25 36 49 64 81 0 ]
+Produced 100 at index 9:
+Buffer:
+[1 4 9 16 25 36 49 64 81 100 ]
+WE ARE DONE

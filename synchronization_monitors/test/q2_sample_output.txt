@@ -1,0 +1,215 @@
+The code was modified to buffer strings and to shrink the buffer rather than just updating the index when consuming for better visualization.
+The producers stop when 30 items have been produced, and the consumer stops when 30 items have been consumed.
+Produced A at index 0:
+Buffer:
+[A               ]
+Totals: 1 Produced , 0 Consumed
+Consumed A at index 0:
+Buffer:
+[               ]
+Produced B at index 0:
+Buffer:
+[B               ]
+Produced C at index 1:
+Buffer:
+[B C              ]
+Consumed C at index 1:
+Buffer:
+[B               ]
+Totals: 3 Produced , 2 Consumed
+Produced C at index 1:
+Buffer:
+[B C              ]
+Produced A at index 2:
+Buffer:
+[B C A             ]
+Produced B at index 3:
+Buffer:
+[B C A B            ]
+Consumed B at index 3:
+Buffer:
+[B C A             ]
+Consumed A at index 2:
+Buffer:
+[B C              ]
+Totals: 6 Produced , 4 Consumed
+Produced C at index 2:
+Buffer:
+[B C C             ]
+Produced B at index 3:
+Buffer:
+[B C C B            ]
+Produced A at index 4:
+Buffer:
+[B C C B A           ]
+Produced C at index 5:
+Buffer:
+[B C C B A C          ]
+Produced B at index 6:
+Buffer:
+[B C C B A C B         ]
+Totals: 11 Produced , 4 Consumed
+Produced A at index 7:
+Buffer:
+[B C C B A C B A        ]
+Consumed A at index 7:
+Buffer:
+[B C C B A C B         ]
+Produced A at index 7:
+Buffer:
+[B C C B A C B A        ]
+Produced B at index 8:
+Buffer:
+[B C C B A C B A B       ]
+Consumed B at index 8:
+Buffer:
+[B C C B A C B A        ]
+Totals: 14 Produced , 6 Consumed
+Produced C at index 8:
+Buffer:
+[B C C B A C B A C       ]
+Produced B at index 9:
+Buffer:
+[B C C B A C B A C B      ]
+Produced A at index 10:
+Buffer:
+[B C C B A C B A C B A     ]
+Totals: 17 Produced , 6 Consumed
+Produced C at index 11:
+Buffer:
+[B C C B A C B A C B A C    ]
+Consumed C at index 11:
+Buffer:
+[B C C B A C B A C B A     ]
+Consumed A at index 10:
+Buffer:
+[B C C B A C B A C B      ]
+Produced A at index 10:
+Buffer:
+[B C C B A C B A C B A     ]
+Produced C at index 11:
+Buffer:
+[B C C B A C B A C B A C    ]
+Produced B at index 12:
+Buffer:
+[B C C B A C B A C B A C B   ]
+Totals: 21 Produced , 8 Consumed
+Produced A at index 13:
+Buffer:
+[B C C B A C B A C B A C B A  ]
+Produced C at index 14:
+Buffer:
+[B C C B A C B A C B A C B A C ]
+Totals: 23 Produced , 8 Consumed
+Consumed C at index 14:
+Buffer:
+[B C C B A C B A C B A C B A  ]
+Produced B at index 14:
+Buffer:
+[B C C B A C B A C B A C B A B ]
+Consumed B at index 14:
+Buffer:
+[B C C B A C B A C B A C B A  ]
+Produced A at index 14:
+Buffer:
+[B C C B A C B A C B A C B A A ]
+Totals: 25 Produced , 10 Consumed
+Totals: 25 Produced , 10 Consumed
+Consumed A at index 14:
+Buffer:
+[B C C B A C B A C B A C B A  ]
+Consumed A at index 13:
+Buffer:
+[B C C B A C B A C B A C B   ]
+Produced C at index 13:
+Buffer:
+[B C C B A C B A C B A C B C  ]
+Produced A at index 14:
+Buffer:
+[B C C B A C B A C B A C B C A ]
+Totals: 27 Produced , 12 Consumed
+Totals: 27 Produced , 12 Consumed
+Consumed A at index 14:
+Buffer:
+[B C C B A C B A C B A C B C  ]
+Consumed C at index 13:
+Buffer:
+[B C C B A C B A C B A C B   ]
+Produced B at index 13:
+Buffer:
+[B C C B A C B A C B A C B B  ]
+Totals: 28 Produced , 14 Consumed
+Produced C at index 14:
+Buffer:
+[B C C B A C B A C B A C B B C ]
+Totals: 29 Produced , 14 Consumed
+Consumed C at index 14:
+Buffer:
+[B C C B A C B A C B A C B B  ]
+Produced A at index 14:
+Buffer:
+[B C C B A C B A C B A C B B A ]
+Consumed A at index 14:
+Buffer:
+[B C C B A C B A C B A C B B  ]
+Producer C done as 30 items total have been produced! Exiting this thread.
+Totals: 30 Produced , 16 Consumed
+Producer A done as 30 items total have been produced! Exiting this thread.
+Totals: 30 Produced , 16 Consumed
+Consumed B at index 13:
+Buffer:
+[B C C B A C B A C B A C B   ]
+Producer B done as 30 items total have been produced! Exiting this thread.
+Consumed B at index 12:
+Buffer:
+[B C C B A C B A C B A C    ]
+Totals: 30 Produced , 18 Consumed
+Totals: 30 Produced , 18 Consumed
+Consumed C at index 11:
+Buffer:
+[B C C B A C B A C B A     ]
+Totals: 30 Produced , 19 Consumed
+Consumed A at index 10:
+Buffer:
+[B C C B A C B A C B      ]
+Totals: 30 Produced , 20 Consumed
+Consumed B at index 9:
+Buffer:
+[B C C B A C B A C       ]
+Consumed C at index 8:
+Buffer:
+[B C C B A C B A        ]
+Totals: 30 Produced , 22 Consumed
+Totals: 30 Produced , 22 Consumed
+Consumed A at index 7:
+Buffer:
+[B C C B A C B         ]
+Totals: 30 Produced , 23 Consumed
+Consumed B at index 6:
+Buffer:
+[B C C B A C          ]
+Totals: 30 Produced , 24 Consumed
+Consumed C at index 5:
+Buffer:
+[B C C B A           ]
+Consumed A at index 4:
+Buffer:
+[B C C B            ]
+Totals: 30 Produced , 26 Consumed
+Totals: 30 Produced , 26 Consumed
+Consumed B at index 3:
+Buffer:
+[B C C             ]
+Totals: 30 Produced , 27 Consumed
+Consumed C at index 2:
+Buffer:
+[B C              ]
+Totals: 30 Produced , 28 Consumed
+Consumed C at index 1:
+Buffer:
+[B               ]
+Consumed B at index 0:
+Buffer:
+[               ]
+Totals: 30 Produced , 30 Consumed
+WE ARE DONE

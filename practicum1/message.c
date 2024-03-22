@@ -1,9 +1,47 @@
 #define _GNU_SOURCE
-#include "message.h"
 #include <stdio.h>
 #include <string.h>
+#include "message.h"
 
 
+cache_t cache;
+
+
+int hash_id(unsigned int id){
+    return id % 16;
+}
+int hash(message_t* message){
+    return hash_id(message->id);
+}
+void insert_message_into_cache(cache_t* cache, message_t* message){
+    /**
+     * Inserts the message into the cache at the index given by the hash function
+    */
+    int index = hash(message);
+    cache->messages[index] = *message;
+    return;
+
+}
+
+int message_in_cache(cache_t* cache, unsigned int id){
+    /**
+     * Returns 1 if the message is in the cache, 0 otherwise
+     
+    */
+    int index = hash_id(id);
+    if (cache->messages[index].id == id){
+        return 1;
+    }
+    return 0;
+}
+
+message_t* get_message_from_cache(cache_t* cache, unsigned int id){
+    /**
+     * Returns the message from the cache given its unique identifier
+    */
+    int index = hash_id(id);
+    return &(cache->messages[index]);
+}
 
 message_t* create_msg(unsigned int id, long timeSent, char* sender, char* receiver, char* content, int delivered){
     /**
@@ -44,6 +82,8 @@ void store_msg(message_t* msg){
      * The seperate messages in the message_store are sepearted by a newline character, and the fields are seperated by pipes
     */
 
+
+
     unsigned int id = msg->id;
 
     FILE* file = fopen("message_store.txt", "a");
@@ -51,6 +91,8 @@ void store_msg(message_t* msg){
     fprintf(file, "%d|%ld|%s|%s|%s|%d\n", msg->id, msg->timeSent, msg->sender, msg->receiver, msg->content, msg->delivered);
 
     fclose(file);
+
+    insert_message_into_cache(&cache, msg); // insert whether or nnot themessage is already in caceh
 
 }
 
@@ -105,6 +147,10 @@ message_t* retrieve_msg(unsigned int id){
     /**
      * Retrieves a message given its unique identifier from the message store.
     */
+
+    if(message_in_cache(&cache, id)){
+        return get_message_from_cache(&cache, id);
+    }
 
     FILE* file = fopen("message_store.txt", "r");
 

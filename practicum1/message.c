@@ -7,6 +7,13 @@
 cache_t cache;
 
 
+void init_cache(){
+    for (int i = 0; i < 16; i++){
+        cache.messages[i] = NULL; // initialize all messages to NULL
+    }
+}
+
+
 int hash_id(unsigned int id){
     return id % 16;
 }
@@ -18,7 +25,7 @@ void insert_message_into_cache(cache_t* cache, message_t* message){
      * Inserts the message into the cache at the index given by the hash function
     */
     int index = hash(message);
-    cache->messages[index] = *message;
+    cache->messages[index] = message;
     return;
 
 }
@@ -29,10 +36,19 @@ int message_in_cache(cache_t* cache, unsigned int id){
      
     */
     int index = hash_id(id);
-    if (cache->messages[index].id == id){
+    if (cache->messages[index]->id == id){
         return 1;
     }
     return 0;
+}
+void* copy_object(void* object, size_t size){
+    void* copy = malloc(size);
+    if (copy == NULL){
+        fprintf(stderr, "Malloc failed!\n");
+        exit(1);
+    }
+    memcpy(copy, object, size);
+    return copy;
 }
 
 message_t* get_message_from_cache(cache_t* cache, unsigned int id){
@@ -40,8 +56,9 @@ message_t* get_message_from_cache(cache_t* cache, unsigned int id){
      * Returns the message from the cache given its unique identifier
     */
     int index = hash_id(id);
-    return &(cache->messages[index]);
+    return copy_object(cache->messages[index], sizeof(message_t));
 }
+
 
 message_t* create_msg(unsigned int id, long timeSent, char* sender, char* receiver, char* content, int delivered){
     /**
@@ -146,6 +163,11 @@ message_t* read_msg_from_line(char* message_line){
 message_t* retrieve_msg(unsigned int id){
     /**
      * Retrieves a message given its unique identifier from the message store.
+     * 
+     * NOTE: returns a copy of the message and not the original message.
+     * If you would like to modify the message and save changes, please call store_msg with the modified message.
+     * The reason for this is we don't want users updating the id of messages in the cache, as their position in the cache is determined by their id.
+     * 
     */
 
     if(message_in_cache(&cache, id)){
@@ -187,4 +209,16 @@ void clear_message_store(){
     } else {
         printf("Could not find message store to delete\n");
     }
+
+
+    // ommited due to leading to double free errors
+    // for (int i = 0; i < 16; i++){
+    //     if (cache.messages[i] != NULL){
+    //         free(cache.messages[i]); // free memory 
+    //         cache.messages[i] = NULL; // empty;
+    //     }
+
+    // }
+
+
 }

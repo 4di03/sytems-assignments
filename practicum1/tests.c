@@ -4,6 +4,10 @@
 #include <assert.h> 
 #include <string.h>
 
+
+
+
+
 int message_equals(message_t* msgA, message_t* msgB){
     return msgA->id == msgB->id && msgA->timeSent == msgB->timeSent && strcmp(msgA->sender, msgB->sender) == 0 && strcmp(msgA->receiver, msgB->receiver) == 0 && strcmp(msgA->content, msgB->content) == 0 && msgA->delivered == msgB->delivered;
 }
@@ -102,12 +106,22 @@ void run_message_tests(){
     printf("Tests passed for message.h ✓\n");
 }
 
-
-int main(){
+void runAllTests(enum ReplacementPolicy policy){
+    printf("Running all tests . . .\n");
+    init_cache(policy);
     run_cache_test();
-
     clear_message_store();
     run_message_tests();
+    printf("All tests passed ✓\n");
+}
+
+
+int main(){
+    printf("Running all tests for RANDOM . . .\n");
+    runAllTests(RANDOM);
+    
+    printf("Running all tests for LRU . . .\n");
+    runAllTests(LRU);
 
     return 0;
 }

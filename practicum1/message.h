@@ -13,6 +13,7 @@ void clear_message_store();
 
 void insert_message_into_cache(cache_t* cache, message_t* message);
 
+int message_in_global_cache(unsigned int id);
 int message_in_cache(cache_t* cache, unsigned int id);
 
 message_t* get_message_from_cache(cache_t* cache, unsigned int id);

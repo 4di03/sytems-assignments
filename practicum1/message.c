@@ -8,10 +8,13 @@ cache_t cache;
 
 
 void init_cache(enum ReplacementPolicy replacementPolicy){
+    /**
+     * Reinitalizes the cache, refreshing all related values;
+    */
     cache.replacementPolicy = replacementPolicy;
-
-
-
+    cache.numHits = 0;
+    cache.numMisses = 0;
+    cache.capacity = 0;
     for (int i = 0; i < 16; i++){
         cache.messages[i] = NULL; // initialize all messages to NULL
     }
@@ -24,107 +27,6 @@ int hash_id(unsigned int id){
 int hash(message_t* message){
     return hash_id(message->id);
 }
-
-
-void lru_insert(cache_t* cache, message_t* message){
-    /**
-     * Inserts the message into the cache using the least recently used replacement policy
-    */
-   if(cache->capacity < CACHE_SIZE){
-       cache->messages[cache->capacity] = message;
-       message->cached_time = cache->capacity;
-       cache->capacity++;
-       return;
-   }else{
-
-
-   for (int i = 0 ; i < cache->capacity; i++){
-
-         if (cache->messages[i]->cached_time == 0){
-            free(cache->messages[i]); // free it as we are deleting it
-            cache->messages[i] = message;
-         }else{
-            cache->messages[i]->cached_time--; // to make sure the least recently used message is at index 0
-         } 
-   }
-
-   // Least recently used message is at index min_cache_index
-
-
-   }
-}
-
-
-void random_insert(cache_t* cache, message_t* message){
-    /**
-     * Inserts the message into the cache using the random replacement policy
-    */
-
-   int index;
-    if (cache->capacity < CACHE_SIZE){
-        // if the cache is not full, we can just insert the message
-        index = cache->capacity;
-
-        cache->capacity++;
-
-    }else{
-
-    int index = rand() % 16;
-
-    if (cache->messages[index] != NULL){
-        free(cache->messages[index]); // free memory as we are overriding it
-    }
-    }
-
-    cache->messages[index] = message;
-    return;
-}
-
-void insert_message_into_cache(cache_t* cache, message_t* message){
-    /**
-     * Inserts the message into the cache at the index given by the hash function
-    */
-   cache->capacity++;
-
-   if (cache->replacementPolicy == LRU){
-
-       lru_insert(cache, message);
-    }else{
-        random_insert(cache, message);
-    }
-
-    // if (cache->messages[hash(message)] != NULL){
-    //     // if the message is already in the cache, we don't want to insert it again
-    //     return;
-    // }
-
-    // int index = hash(message);
-    // cache->messages[index] = message;
-    // return;
-
-}
-
-int message_in_cache(cache_t* cache, unsigned int id){
-    /**
-     * Returns 1 if the message is in the cache, 0 otherwise
-     
-    */
-    int index = hash_id(id);
-    if (cache->messages[index]->id == id){
-        return index;
-    }
-    return -1;
-}
-void* copy_object(void* object, size_t size){
-    void* copy = malloc(size);
-    if (copy == NULL){
-        fprintf(stderr, "Malloc failed!\n");
-        exit(1);
-    }
-    memcpy(copy, object, size);
-    return copy;
-}
-
 void update_lru_times(cache_t* cache, int index){
     /**
      * Updates the cached_time field of all messages in the cache
@@ -143,6 +45,119 @@ void update_lru_times(cache_t* cache, int index){
     cache->messages[index]->cached_time = cache->capacity - 1;
 }
 
+void lru_insert(cache_t* cache, message_t* message){
+    /**
+     * Inserts the message into the cache using the least recently used replacement policy
+    */
+
+
+   int store_msg = ! message_in_cache(cache, message->id);
+    int store_index = -1;
+   if(store_msg && cache->capacity < CACHE_SIZE){
+
+       cache->messages[cache->capacity] = message;
+       message->cached_time = cache->capacity;
+       store_index = cache->capacity;
+       cache->capacity++;
+       
+       return;
+   }else{
+    int min_index = 0;
+
+    for (int i = 0 ; i < cache->capacity; i++){
+        
+
+        if(cache->messages[i]->cached_time < cache->messages[min_index]->cached_time){
+            min_index =i;
+        } 
+         if (cache->messages[i]->id == message->id){
+            store_index = i;
+         }
+
+   }
+
+    if(store_msg){
+    free(cache->messages[min_index]); // free it as we are deleting it
+    cache->messages[min_index] = message;
+    store_index = min_index; // store_index will always be null here if store_msg is true
+    }
+
+   }
+
+    // update cached time of recently inserted mesage to be latest
+    update_lru_times(cache,store_index);
+}
+
+
+void random_insert(cache_t* cache, message_t* message){
+    /**
+     * Inserts the message into the cache using the random replacement policy
+    */
+
+   int index;
+    if (cache->capacity < CACHE_SIZE){
+        // if the cache is not full, we can just insert the message
+        index = cache->capacity;
+
+        cache->capacity++;
+
+    }else{
+
+    int index = rand() % CACHE_SIZE;
+
+    if (cache->messages[index] != NULL){
+        free(cache->messages[index]); // free memory as we are overriding it
+    }
+    }
+
+    cache->messages[index] = message;
+    
+    return;
+}
+
+void insert_message_into_cache(cache_t* cache, message_t* message){
+    /**
+     * Inserts the message into the cache at the index given by the hash function
+    */
+
+   if (cache->replacementPolicy == LRU){
+        lru_insert(cache, message);
+    }else{
+        random_insert(cache, message);
+    }
+
+}
+
+
+int message_in_global_cache(unsigned int id){
+    return message_in_cache(&cache, id);
+}
+
+int message_in_cache(cache_t* cache, unsigned int id){
+    /**
+     * Returns 1 if the message is in the cache, 0 otherwise
+     
+    */
+    for (int i =0 ; i< CACHE_SIZE ; i++){
+        if(cache->messages[i] != NULL && cache->messages[i]->id == id){
+            return 1;
+        }
+
+    }
+    return 0;
+}
+void* copy_object(void* object, size_t size){
+    void* copy = malloc(size);
+    if (copy == NULL){
+        fprintf(stderr, "Malloc failed!\n");
+        exit(1);
+    }
+    memcpy(copy, object, size);
+    return copy;
+}
+
+
+
 message_t* get_message_from_cache(cache_t* cache, unsigned int id){
     /**
      * Returns the message from the cache given its unique identifier
@@ -153,9 +168,6 @@ message_t* get_message_from_cache(cache_t* cache, unsigned int id){
            return copy_object(cache->messages[i], sizeof(message_t));
        }
    }
-
-
-
 
 }
 
@@ -244,7 +256,6 @@ int id_matches(char* message_line, unsigned int id){
 
 
 
-
 message_t* read_msg_from_line(char* message_line){
     /**
      * Creates a message_t instance on the heap given a string representing the message. 
@@ -270,7 +281,7 @@ message_t* retrieve_msg(unsigned int id){
      * 
     */
 
-    if(message_in_cache(&cache, id) != -1){
+    if(message_in_cache(&cache, id)){
         cache.numHits++;
         return get_message_from_cache(&cache, id);
     }else{

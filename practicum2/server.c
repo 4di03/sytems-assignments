@@ -5,18 +5,53 @@
  *   https://www.educative.io/answers/how-to-implement-tcp-sockets-in-c
  */
 
+/**
+ * Notes:
+  Hi all, just wanted to let you know that I added a couple additional sentences in the practicum 2 handout on canvas:
+
+  If a client tries to delete a file that is read-only, it should also fail as though they are trying to write to it (deleting a file is treated like modifying or writing to it)
+  For the bonus to implement encryption, you can use the previous cipher program if you want, but you can also extensively modify it or even implement some completely different algorithm if you want. 
+*/
+
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include "commands.h"
+
+
+int connect_to_client(int socket_desc){
+  /**
+   * Accepts incoming client connection
+  */
+  
+  printf("\nListening for incoming connections.....\n");
+
+  struct sockaddr_in client_addr;
+  // Accept an incoming connection:
+  socklen_t client_size = sizeof(client_addr);
+  int client_sock = accept(socket_desc, (struct sockaddr*)&client_addr, &client_size);
+  
+  if (client_sock < 0){
+    printf("Can't accept\n");
+    close(socket_desc);
+    close(client_sock);
+    return -1;
+  }
+  printf("Client connected at IP: %s and port: %i\n", 
+         inet_ntoa(client_addr.sin_addr), 
+         ntohs(client_addr.sin_port));
+
+  return client_sock;
+}
+
 
 int main(void)
 {
-  int socket_desc, client_sock;
-  socklen_t client_size;
-  struct sockaddr_in server_addr, client_addr;
-  char server_message[8196], client_message[8196];
+  int socket_desc;
+  struct sockaddr_in server_addr;
+ char client_message[8196];
   
   // Clean buffers:
   memset(server_message, '\0', sizeof(server_message));
@@ -50,26 +85,10 @@ int main(void)
   }
   
    
-
+  int client_sock;
   do {
-
-
-  printf("\nListening for incoming connections.....\n");
-
-  // Accept an incoming connection:
-  client_size = sizeof(client_addr);
-  client_sock = accept(socket_desc, (struct sockaddr*)&client_addr, &client_size);
-  
-  if (client_sock < 0){
-    printf("Can't accept\n");
-    close(socket_desc);
-    close(client_sock);
-    return -1;
-  }
-  printf("Client connected at IP: %s and port: %i\n", 
-         inet_ntoa(client_addr.sin_addr), 
-         ntohs(client_addr.sin_port));
-  
+  // Accept incoming client connection
+  client_sock = connect_to_client(socket_desc);
   // Receive client's message:
   if (recv(client_sock, client_message, 
            sizeof(client_message), 0) < 0){
@@ -79,9 +98,9 @@ int main(void)
     return -1;
   }
   printf("Msg from client: %s\n", client_message);
-  
-  // Respond to client:
-  strcpy(server_message, "This is the server's response message.");
+
+  // Process the request:
+  char* server_message = process_request(client_message, client_sock);
   
   if (send(client_sock, server_message, strlen(server_message), 0) < 0){
     printf("Can't send\n");
@@ -91,8 +110,8 @@ int main(void)
 
   }
 
-
-  } while (strcmp(client_message, "exit") != 0); // when teh client doesnt send the exit message.
+  } while (strcmp(client_message, "exit") != 0); // when the client doesnt send the exit message. 
+  //  TODO: find a better way to close the server, client shouldn't be able to close the server.
 
   printf("Closing the server\n");
   

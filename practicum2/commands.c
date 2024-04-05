@@ -5,8 +5,27 @@
 */
 
 #include <sys/socket.h>
-#define MAX_FILE_SIZE 1024
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "commands.h"
+
+char* get_actual_fp(char* filePath, int remote){
+    /**
+     * returns the actual path to the remote filesystem given a relative path from its root.
+     * args:
+     * filePath (char*): relative path to file
+     * remote (int): 1 if the file is on the remote filesystem, 0 otherwie(local)
+     * 
+    */
+
+    char* fs_loc = remote ? "server_fs" : "client_fs";
+
+    char* remote_fp = malloc(sizeof(char) * 1024);
+    sprintf(remote_fp, "filesystem/%s/%s", fs_loc ,filePath);
+    return remote_fp;
+
+}
 
 char** split_str(char* str, char* delim){
     /**
@@ -42,7 +61,8 @@ char* write(char* localFile, char* remoteFilePath){
     */
 
 
-    FILE* file = fopen(remoteFilePath, "w");
+
+    FILE* file = fopen(get_actual_fp(remoteFilePath, 1), "w");
     if (file == NULL){
         return "Error opening file!\n";
     }
@@ -51,7 +71,11 @@ char* write(char* localFile, char* remoteFilePath){
 
     fclose(file);
 
-    return "File written successfully!\n";
+    char* out_message = malloc(sizeof(char) * MAX_COMMAND_SIZE);
+
+    sprintf(out_message, "File written successfully to %s!\n", remoteFilePath);
+
+    return out_message;
 }
 
 char* read(char* remoteFilePath, int client_sock){
@@ -63,7 +87,9 @@ char* read(char* remoteFilePath, int client_sock){
      * client_sock (int): client socket
     */
 
-    FILE* file = fopen(remoteFilePath, "r");
+    
+
+    FILE* file = fopen(get_actual_fp(remoteFilePath,1), "r");
     if (file == NULL){
         printf("Error opening file!\n");
         exit(1);
@@ -75,7 +101,12 @@ char* read(char* remoteFilePath, int client_sock){
     fclose(file);
 
     send(client_sock, file_data, strlen(file_data), 0);
-    return "File sent successfully!\n";
+    
+
+    char* response = malloc(sizeof(char) * MAX_FILE_SIZE + 20);
+
+    sprintf(response, "File Data:\n%s", file_data);
+    return response;
 }
 
 char* delete(char* remoteFilePath){
@@ -108,7 +139,7 @@ char* process_request(char* request, int client_sock){
 
 
     int i = 0;
-    char* command = malloc(sizeof(char) * 1000);
+    char* command = malloc(sizeof(char) * MAX_COMMAND_SIZE);
 
     while (request[i] != '\n'){
         command[i] = request[i];
@@ -156,7 +187,7 @@ char* process_request(char* request, int client_sock){
 
     } else {
 
-        return Invalid command! The command after RFS should be one of WRITE, GET, or RM\n";
+        return "Invalid command! The command after RFS should be one of WRITE, GET, or RM\n";
     }
 
 

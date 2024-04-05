@@ -49,12 +49,11 @@ int connect_to_client(int socket_desc){
 
 int main(void)
 {
-  int socket_desc;
-  struct sockaddr_in server_addr;
+ int socket_desc;
+ struct sockaddr_in server_addr;
  char client_message[8196];
   
   // Clean buffers:
-  memset(server_message, '\0', sizeof(server_message));
   memset(client_message, '\0', sizeof(client_message));
   
   // Create socket:

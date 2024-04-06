@@ -9,6 +9,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include "commands.h"
+#include <dirent.h>
+#include <libgen.h>
+#include <sys/stat.h>
 
 char* get_actual_fp(char* filePath, int remote){
     /**
@@ -22,7 +25,7 @@ char* get_actual_fp(char* filePath, int remote){
     char* fs_loc = remote ? "server_fs" : "client_fs";
 
     char* remote_fp = malloc(sizeof(char) * 1024);
-    sprintf(remote_fp, "filesystem/%s/%s", fs_loc ,filePath);
+    sprintf(remote_fp, "filesystems/%s/%s", fs_loc ,filePath);
     return remote_fp;
 
 }
@@ -46,7 +49,70 @@ char** split_str(char* str, char* delim){
     return result;
 }
 
-char* write(char* fileData, char* remoteFilePath){
+int directory_exists(char* dirPath){
+    /**
+     * Check if directory exists.
+     * 
+     * Args:
+     * dirPath (char*): path to directory
+     * 
+     * returns:
+     * int: 1 if directory exists, 0 otherwise
+    */
+
+    if (opendir(dirPath)){
+        return 1;
+    }
+
+    return 0;
+}
+
+void make_parent_dirs(char* filePath){
+    /**
+     * Create parent directories for a file.
+     * 
+     * Args:
+     * filePath (char*): path to file
+    */
+
+    char* copyFilePath = strdup(filePath); // copy the file path to avoid modifying the original
+
+    char* dir = dirname(copyFilePath);
+
+    if(!directory_exists(dir)){
+
+        make_parent_dirs(dir); // recursively create parent directories until a direector that is already made is reached
+        mkdir(dir, 0777);
+    }
+
+
+}
+
+char* write_data_to_file(char* fileData, char* filePath){
+    /**
+     * Write data to file.
+     * 
+     * Args:
+     * fileData (char*): data to write to file
+     * filePath (char*): path to file
+    */
+
+    make_parent_dirs(filePath);
+
+    FILE* file = fopen(filePath, "w");
+    if (file == NULL){
+        return "Error opening file!\n";
+        exit(1);
+    }
+
+    fputs(fileData, file);
+
+    fclose(file);
+
+    return "File written successfully!\n";
+}
+
+char* write_remote(char* fileData, char* remoteFilePath){
     /**
      * Write file to server.
      * 
@@ -59,16 +125,9 @@ char* write(char* fileData, char* remoteFilePath){
      * 
     */
 
+   char* fp = get_actual_fp(remoteFilePath, 1);
 
-
-    FILE* file = fopen(get_actual_fp(remoteFilePath, 1), "w");
-    if (file == NULL){
-        return "Error opening file!\n";
-    }
-
-    fputs(fileData, file);
-
-    fclose(file);
+    write_data_to_file(fileData, fp);
 
     char* out_message = malloc(sizeof(char) * MAX_COMMAND_SIZE);
 
@@ -77,7 +136,24 @@ char* write(char* fileData, char* remoteFilePath){
     return out_message;
 }
 
-char* read(char* remoteFilePath, int client_sock){
+int custom_strcmp(char* str1, char* str2){
+  /**
+   * Compares strings even if their buffer sizes are different.
+   * 
+   * returns:
+   *  1 if strings are equal, 0 otherwise
+  */
+  int i = 0;
+  while (str1[i] != '\0' && str2[i] != '\0'){
+    if (str1[i] != str2[i]){
+      return 0;
+    }
+    i++;
+  }
+  return str1[i] == str2[i];
+}
+
+char* read_remote(char* remoteFilePath){
     /**
      * Read file from server, and send to client.
      * 
@@ -99,9 +175,6 @@ char* read(char* remoteFilePath, int client_sock){
 
     fclose(file);
 
-    send(client_sock, file_data, strlen(file_data), 0);
-    
-
     char* response = malloc(sizeof(char) * MAX_FILE_SIZE + 20);
 
     sprintf(response, "File Data:\n%s", file_data);
@@ -116,7 +189,7 @@ char* delete(char* remoteFilePath){
      * remoteFilePath (char*): path to remote file
     */
 
-    if (remove(remoteFilePath) != 0){
+    if (remove(get_actual_fp(remoteFilePath, 1)) != 0){
         return "Error deleting file!\n";
     }
 
@@ -125,7 +198,7 @@ char* delete(char* remoteFilePath){
 
 char* process_request(char* request, int client_sock){
     /**
-     * Helper to process command from client.
+     * Helper to process command from client on the serverside.
      * 
      * Args:
      * command (char*): command from client
@@ -156,6 +229,7 @@ char* process_request(char* request, int client_sock){
 
     }
     if (command_split[1] == "WRITE"){
+        // request should be in form rfs WRITE <remote_file_path> <file_data?
 
         char* remaining_data = malloc(sizeof(char) * 1024);
 
@@ -174,13 +248,15 @@ char* process_request(char* request, int client_sock){
 
         remaining_data = realloc(remaining_data, sizeof(char) * (j+1));
         
-        return write(remaining_data, command_split[3]);
+        return write_remote(remaining_data, command_split[3]);
 
     }else if (command_split[1] == "GET"){
+        // request should be in form rfs GET <remote_file_path> 
 
-        return read(command_split[3], client_sock);
+        return read_remote(command_split[3]);
 
     } else if (command_split[1] == "RM"){
+        // request should be in form rfs RM <remote_file_path> 
 
         return delete(command_split[2]);
 

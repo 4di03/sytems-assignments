@@ -1,4 +1,4 @@
-all: server client
+all: server client tests
 
 server: server.c commands.c
 	gcc server.c commands.c -o server 
@@ -6,6 +6,5 @@ server: server.c commands.c
 client: client.c commands.c
 	gcc client.c commands.c -o client
 
-
-tests: tests.c client.c server.c commands.c
-	gcc tests.c client.c server.c commands.c -o test
+tests: tests.c commands.c
+	gcc tests.c commands.c -o test

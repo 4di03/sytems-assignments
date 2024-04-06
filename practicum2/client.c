@@ -11,22 +11,54 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include "commands.h"
+#include <stdlib.h>
 
-int custom_strcmp(char* str1, char* str2){
+char* prepare_message(char* raw_message){
   /**
-   * Compares strings even if their buffer sizes are different.
-   * 
-   * returns:
-   *  1 if strings are equal, 0 otherwise
+   * Converts the raw message given by the client to one that can be processed by the server.
   */
-  int i = 0;
-  while (str1[i] != '\0' && str2[i] != '\0'){
-    if (str1[i] != str2[i]){
-      return 0;
+  char** message_split = split_str(raw_message, " ");
+  if (custom_strcmp(message_split[1], "WRITE")){;
+    // will be in form 'rfs WRITE <local file path> <remote file path>'
+    // missing remote file name defaults to local file name
+    char* localFilePath = message_split[2];
+    char* remoteFilePath;
+    if (message_split[3] == NULL){
+      remoteFilePath = localFilePath;
+    }else{
+      remoteFilePath = message_split[3];
     }
-    i++;
+
+    char* actualFilePath = get_actual_fp(localFilePath, 0);
+
+    char* fileData = malloc(sizeof(char) * MAX_FILE_SIZE);
+
+    FILE* actualFile = fopen(actualFilePath, "r");
+
+    fgets(fileData, MAX_FILE_SIZE, actualFile);
+
+    fclose(actualFile);
+    char* response = malloc(sizeof(char) * MAX_COMMAND_SIZE);
+
+    sprintf(response, "rfs WRITE %s %s", remoteFilePath, fileData);
+    return response;
+  } else if (custom_strcmp(message_split[1], "GET")){
+    // will be in form 'rfs GET <remote file path> <local file path>'
+    // missing local file name defaults to remote file name
+
+    char* remoteFilePath = message_split[2];
+
+    if (remoteFilePath == NULL){
+      printf("Invalid use of GET, must provide remote file path.\n");
+      exit(1);
+    }
+    char* response = malloc(sizeof(char) * MAX_COMMAND_SIZE);
+
+    sprintf(response, "rfs GET %s", remoteFilePath);    
+    return response;
+  } else{
+    return raw_message;
   }
-  return str1[i] == str2[i];
 }
 
 void handle_response(char* server_message , char* client_message){
@@ -71,19 +103,19 @@ void handle_response(char* server_message , char* client_message){
       printf("Invalid command\n");
     }
 
+    free(command_split);
   
 }
 
 
-
-int main() {
+int run_client(){
   int socket_desc;
   struct sockaddr_in server_addr;
-  char server_message[2000], client_message[2000];
+  char server_message[2000], raw_message[2000];
 
   // Clean buffers:
   memset(server_message, '\0', sizeof(server_message));
-  memset(client_message, '\0', sizeof(client_message));
+  memset(raw_message, '\0', sizeof(raw_message));
   int state = 0;
 
   while(1){
@@ -91,12 +123,12 @@ int main() {
     // read message before making connection in case user wants to quit right away
     // Get input from the user:
     printf("Enter message: ");
-    fgets(client_message, MAX_COMMAND_SIZE, stdin);
+    fgets(raw_message, MAX_COMMAND_SIZE, stdin);
 
 
-    printf("Client Message: %s\n", client_message);
+    printf("Client Message: %s\n", raw_message);
 
-    if (custom_strcmp(client_message, "exit\n")) {
+    if (custom_strcmp(raw_message, "exit\n")) {
       close(socket_desc);
       printf("Closing the client !\n");
       break;
@@ -144,6 +176,9 @@ int main() {
 
     printf("Connected with server successfully\n");
 
+
+    char* client_message = prepare_message(raw_message);
+
     // Send the message to server:
     if (send(socket_desc, client_message, strlen(client_message), 0) < 0) {
       printf("Unable to send message\n");
@@ -167,4 +202,10 @@ int main() {
     // Close the socket:
 
   return 0;
+}
+
+
+
+int main() {
+return run_client();
 }

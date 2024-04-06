@@ -19,6 +19,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include "commands.h"
+#include <stdlib.h>
 
 
 int connect_to_client(int socket_desc){
@@ -47,8 +48,7 @@ int connect_to_client(int socket_desc){
 }
 
 
-int main(void)
-{
+int run_server(){
  int socket_desc;
  struct sockaddr_in server_addr;
  char client_message[8196];
@@ -119,4 +119,11 @@ int main(void)
   close(socket_desc);
   
   return 0;
+
+}
+
+
+int main(void)
+{
+  return run_server();
 }

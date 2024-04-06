@@ -7,7 +7,7 @@
 #include <libgen.h>
 #include "utils.h"
 
-int custom_strcmp(char* str1, char* str2){
+int string_equal(char* str1, char* str2){
   /**
    * Compares strings even if their buffer sizes are different.
    * 
@@ -44,10 +44,13 @@ char* get_actual_fp(char* filePath, int remote){
 char** split_str(char* str, char* delim){
     /**
      * Split string into list of strings based on delimiter.
+     * 
+     * Doesn't destroy original string.
     */
 
+    char* strCopy = strdup(str); // copy the string to avoid modifying the original
     char** result = malloc(sizeof(char*) * 10);
-    char* token = strtok(str, delim);
+    char* token = strtok(strCopy, delim);
     int i = 0;
     while(token != NULL){
         result[i] = token;

@@ -1,5 +1,5 @@
 
-int custom_strcmp(char* str1, char* str2);
+int string_equal(char* str1, char* str2);
 
 char* get_actual_fp(char* filePath, int remote);
 

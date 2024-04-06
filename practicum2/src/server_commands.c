@@ -16,7 +16,20 @@
 #include "utils.h"
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <netinet/in.h>
+#include <signal.h>
 
+void sigint_handler(int signum){
+  /**
+   * Signal handler for SIGINT (Ctrl+C)
+   * 
+   * Kills the socket listener at port 2000
+  */
+  printf("Ctrl+C (SIGINT) received. Exiting...\n");
+  system("sh kill_tcp_server.sh"); // kills socket listener at port 2000
+
+  exit(signum);
+}
 
 
 char* write_remote(char* fileData, char* remoteFilePath){
@@ -115,37 +128,40 @@ char* process_request(char* request, int client_sock){
 
     char** command_split = split_str(command, " ");
 
-    if (strcmp(command_split[0] ,"rfs") != 0){
+    if (! string_equal(command_split[0] ,"rfs")){
         printf("Invalid command, must start with 'rfs'!\n");
         exit(1);
 
     }
-    if (command_split[1] == "WRITE"){
+    if (string_equal(command_split[1] , "WRITE")){
         // request should be in form rfs WRITE <remote_file_path> <file_data?
 
         char* remoteFilePath = command_split[2];
 
         char* remaining_data = malloc(sizeof(char) * MAX_FILE_SIZE);
 
-        for (int j = 3; j < i; j++){
-            strcat(remaining_data, " ");
+        int j = 3;
+        while (command_split[j] != NULL){
             strcat(remaining_data, command_split[j]);
+            j++;
+            if (command_split[j] != NULL){
+                strcat(remaining_data, " "); // to prevent adding extra space at the end
+            }
         }
         
-        return write_remote(remaining_data, command_split[3]);
+        return write_remote(remaining_data, remoteFilePath);
 
-    }else if (command_split[1] == "GET"){
+    }else if (string_equal(command_split[1], "GET")){
         // request should be in form rfs GET <remote_file_path> 
 
-        return read_remote(command_split[3]);
+        return read_remote(command_split[2]);
 
-    } else if (command_split[1] == "RM"){
+    } else if (string_equal(command_split[1] , "RM")){
         // request should be in form rfs RM <remote_file_path> 
 
         return delete(command_split[2]);
 
     } else {
-
         return "Invalid command! The command after RFS should be one of WRITE, GET, or RM\n";
     }
 
@@ -159,6 +175,7 @@ int connect_to_client(int socket_desc){
    * Accepts incoming client connection
   */
   
+
   printf("\n[Server] Listening for incoming connections.....\n");
 
   struct sockaddr_in client_addr;
@@ -181,13 +198,16 @@ int connect_to_client(int socket_desc){
 
 
 int run_server(){
+
+  if (signal(SIGINT, sigint_handler) == SIG_ERR){
+    printf("Error while setting signal handler\n");
+    return -1;
+  }
+
+
  int socket_desc;
  struct sockaddr_in server_addr;
- char client_message[8196];
-  
-  // Clean buffers:
-  memset(client_message, '\0', sizeof(client_message));
-  
+    
   // Create socket:
   socket_desc = socket(AF_INET, SOCK_STREAM, 0);
   
@@ -217,7 +237,14 @@ int run_server(){
   
    
   int client_sock;
-  do {
+  char client_message[MAX_COMMAND_SIZE];
+
+  while (1){
+
+  // clear the message buffer:
+  memset(client_message, '\0', sizeof(client_message));
+
+
   // Accept incoming client connection
   client_sock = connect_to_client(socket_desc);
   // Receive client's message:
@@ -230,6 +257,10 @@ int run_server(){
   }
   printf("[Server] Recieved message from client: %s\n", client_message);
 
+  if (string_equal(client_message, "exit\n") || string_equal(client_message, "exit")){
+    break;
+  }
+
   // Process the request:
   char* server_message = process_request(client_message, client_sock);
   
@@ -241,7 +272,10 @@ int run_server(){
 
   }
 
-  } while (strcmp(client_message, "exit") != 0); // when the client doesnt send the exit message. 
+
+
+
+  } // when the client doesnt send the exit message. 
   //  TODO: find a better way to close the server, client shouldn't be able to close the server.
 
   printf("[Server] Closing the server\n");

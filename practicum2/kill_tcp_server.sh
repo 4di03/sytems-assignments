@@ -1,0 +1,1 @@
+nc -l -p 2000 & sleep 1 && lsof -ti:2000 | xargs kill -9

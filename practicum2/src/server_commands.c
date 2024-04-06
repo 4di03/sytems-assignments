@@ -8,109 +8,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "commands.h"
+#include "server_commands.h"
 #include <dirent.h>
 #include <libgen.h>
 #include <sys/stat.h>
-
-char* get_actual_fp(char* filePath, int remote){
-    /**
-     * returns the actual path to the remote filesystem given a relative path from its root.
-     * args:
-     * filePath (char*): relative path to file
-     * remote (int): 1 if the file is on the remote filesystem, 0 otherwie(local)
-     * 
-    */
-
-    char* fs_loc = remote ? "server_fs" : "client_fs";
-
-    char* remote_fp = malloc(sizeof(char) * 1024);
-    sprintf(remote_fp, "filesystems/%s/%s", fs_loc ,filePath);
-    return remote_fp;
-
-}
-
-char** split_str(char* str, char* delim){
-    /**
-     * Split string into list of strings based on delimiter.
-    */
-
-    char** result = malloc(sizeof(char*) * 10);
-    char* token = strtok(str, delim);
-    int i = 0;
-    while(token != NULL){
-        result[i] = token;
-        token = strtok(NULL, delim);
-        i++;
-    }
-    result[i] = NULL; // set last element to NULL to indicate end of list
-
-    result = realloc(result, sizeof(char*) * (i+1));
-    return result;
-}
-
-int directory_exists(char* dirPath){
-    /**
-     * Check if directory exists.
-     * 
-     * Args:
-     * dirPath (char*): path to directory
-     * 
-     * returns:
-     * int: 1 if directory exists, 0 otherwise
-    */
-
-    if (opendir(dirPath)){
-        return 1;
-    }
-
-    return 0;
-}
-
-void make_parent_dirs(char* filePath){
-    /**
-     * Create parent directories for a file.
-     * 
-     * Args:
-     * filePath (char*): path to file
-    */
-
-    char* copyFilePath = strdup(filePath); // copy the file path to avoid modifying the original
-
-    char* dir = dirname(copyFilePath);
-
-    if(!directory_exists(dir)){
-
-        make_parent_dirs(dir); // recursively create parent directories until a direector that is already made is reached
-        mkdir(dir, 0777);
-    }
+#include "constants.h"
+#include "utils.h"
+#include <arpa/inet.h>
+#include <unistd.h>
 
 
-}
-
-char* write_data_to_file(char* fileData, char* filePath){
-    /**
-     * Write data to file.
-     * 
-     * Args:
-     * fileData (char*): data to write to file
-     * filePath (char*): path to file
-    */
-
-    make_parent_dirs(filePath);
-
-    FILE* file = fopen(filePath, "w");
-    if (file == NULL){
-        return "Error opening file!\n";
-        exit(1);
-    }
-
-    fputs(fileData, file);
-
-    fclose(file);
-
-    return "File written successfully!\n";
-}
 
 char* write_remote(char* fileData, char* remoteFilePath){
     /**
@@ -136,22 +43,7 @@ char* write_remote(char* fileData, char* remoteFilePath){
     return out_message;
 }
 
-int custom_strcmp(char* str1, char* str2){
-  /**
-   * Compares strings even if their buffer sizes are different.
-   * 
-   * returns:
-   *  1 if strings are equal, 0 otherwise
-  */
-  int i = 0;
-  while (str1[i] != '\0' && str2[i] != '\0'){
-    if (str1[i] != str2[i]){
-      return 0;
-    }
-    i++;
-  }
-  return str1[i] == str2[i];
-}
+
 
 char* read_remote(char* remoteFilePath){
     /**
@@ -213,7 +105,7 @@ char* process_request(char* request, int client_sock){
     int i = 0;
     char* command = malloc(sizeof(char) * MAX_COMMAND_SIZE);
 
-    while (request[i] != '\n'){
+    while (request[i] != '\n' && request[i] != '\0'){
         command[i] = request[i];
         i++;
     }
@@ -231,22 +123,14 @@ char* process_request(char* request, int client_sock){
     if (command_split[1] == "WRITE"){
         // request should be in form rfs WRITE <remote_file_path> <file_data?
 
-        char* remaining_data = malloc(sizeof(char) * 1024);
+        char* remoteFilePath = command_split[2];
 
-        int j =0;
-        while (request[i] != '\0'){
-            remaining_data[j] = request[i];
-            j++;
+        char* remaining_data = malloc(sizeof(char) * MAX_FILE_SIZE);
+
+        for (int j = 3; j < i; j++){
+            strcat(remaining_data, " ");
+            strcat(remaining_data, command_split[j]);
         }
-
-        if (j == 0 && command_split[1] == "WRITE"){
-            printf("No file data provided with WRITE command!\n");
-            exit(1);
-        }
-
-        remaining_data[j] = '\0';
-
-        remaining_data = realloc(remaining_data, sizeof(char) * (j+1));
         
         return write_remote(remaining_data, command_split[3]);
 
@@ -265,5 +149,107 @@ char* process_request(char* request, int client_sock){
         return "Invalid command! The command after RFS should be one of WRITE, GET, or RM\n";
     }
 
+
+}
+
+
+
+int connect_to_client(int socket_desc){
+  /**
+   * Accepts incoming client connection
+  */
+  
+  printf("\n[Server] Listening for incoming connections.....\n");
+
+  struct sockaddr_in client_addr;
+  // Accept an incoming connection:
+  socklen_t client_size = sizeof(client_addr);
+  int client_sock = accept(socket_desc, (struct sockaddr*)&client_addr, &client_size);
+  
+  if (client_sock < 0){
+    printf("[Server] Can't accept\n");
+    close(socket_desc);
+    close(client_sock);
+    return -1;
+  }
+  printf("[Server] Client connected at IP: %s and port: %i\n", 
+         inet_ntoa(client_addr.sin_addr), 
+         ntohs(client_addr.sin_port));
+
+  return client_sock;
+}
+
+
+int run_server(){
+ int socket_desc;
+ struct sockaddr_in server_addr;
+ char client_message[8196];
+  
+  // Clean buffers:
+  memset(client_message, '\0', sizeof(client_message));
+  
+  // Create socket:
+  socket_desc = socket(AF_INET, SOCK_STREAM, 0);
+  
+  if(socket_desc < 0){
+    printf("Error while creating socket\n");
+    return -1;
+  }
+  printf("Socket created successfully\n");
+  
+  // Set port and IP:
+  server_addr.sin_family = AF_INET;
+  server_addr.sin_port = htons(2000);
+  server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+  
+  // Bind to the set port and IP:
+  if(bind(socket_desc, (struct sockaddr*)&server_addr, sizeof(server_addr))<0){
+    printf("[Server] Couldn't bind to the port\n");
+    return -1;
+  }
+  printf("[Server] Done with binding\n");
+     // Listen for clients:
+  if(listen(socket_desc, 1) < 0){
+    printf("Error while listening\n");
+    close(socket_desc);
+    return -1;
+  }
+  
+   
+  int client_sock;
+  do {
+  // Accept incoming client connection
+  client_sock = connect_to_client(socket_desc);
+  // Receive client's message:
+  if (recv(client_sock, client_message, 
+           sizeof(client_message), 0) < 0){
+    printf("[Server] Couldn't receive\n");
+    close(socket_desc);
+    close(client_sock);
+    return -1;
+  }
+  printf("[Server] Recieved message from client: %s\n", client_message);
+
+  // Process the request:
+  char* server_message = process_request(client_message, client_sock);
+  
+  if (send(client_sock, server_message, strlen(server_message), 0) < 0){
+    printf("[Server] Can't send\n");
+    close(socket_desc);
+    close(client_sock);
+    return -1;
+
+  }
+
+  } while (strcmp(client_message, "exit") != 0); // when the client doesnt send the exit message. 
+  //  TODO: find a better way to close the server, client shouldn't be able to close the server.
+
+  printf("[Server] Closing the server\n");
+  
+  // Closing the socket:
+  close(client_sock);
+  close(socket_desc);
+  
+  return 0;
 
 }

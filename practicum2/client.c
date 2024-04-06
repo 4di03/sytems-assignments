@@ -12,16 +12,31 @@
 #include <unistd.h>
 #include "commands.h"
 
-
+int custom_strcmp(char* str1, char* str2){
+  /**
+   * Compares strings even if their buffer sizes are different.
+   * 
+   * returns:
+   *  1 if strings are equal, 0 otherwise
+  */
+  int i = 0;
+  while (str1[i] != '\0' && str2[i] != '\0'){
+    if (str1[i] != str2[i]){
+      return 0;
+    }
+    i++;
+  }
+  return str1[i] == str2[i];
+}
 
 void handle_response(char* server_message , char* client_message){
     char** command_split = split_str(client_message, " ");
 
-    if (command_split[1] == "WRITE"){
+    if (custom_strcmp(command_split[1] , "WRITE")){
       printf("Attempted to write %s to remote location : %s\n", command_split[2], command_split[3]);
 
       printf("Server Response: %s\n", server_message);
-    }else if (command_split[1] == "GET"){
+    }else if (custom_strcmp(command_split[1] , "GET")){
       int startReading = 0;
       char* remoteFilePath = command_split[2];
       char* localFilePath = get_actual_fp(command_split[3], 0);
@@ -59,6 +74,8 @@ void handle_response(char* server_message , char* client_message){
   
 }
 
+
+
 int main() {
   int socket_desc;
   struct sockaddr_in server_addr;
@@ -77,9 +94,9 @@ int main() {
     fgets(client_message, MAX_COMMAND_SIZE, stdin);
 
 
-    prtinf("Client Message: %s\n", client_message);
+    printf("Client Message: %s\n", client_message);
 
-    if (strcmp(client_message, "exit") == 0) {
+    if (custom_strcmp(client_message, "exit\n")) {
       close(socket_desc);
       printf("Closing the client !\n");
       break;

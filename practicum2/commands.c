@@ -46,14 +46,13 @@ char** split_str(char* str, char* delim){
     return result;
 }
 
-char* write(char* localFile, char* remoteFilePath){
+char* write(char* fileData, char* remoteFilePath){
     /**
      * Write file to server.
      * 
      * Args:
-     * localFilePath (char*): path to local file
+     * localFile (char*): data of file to write.
      * remoteFilePath (char*): path to remote file
-     * client_sock (int): client socket
      * 
      * returns:
      * char*: response message
@@ -67,7 +66,7 @@ char* write(char* localFile, char* remoteFilePath){
         return "Error opening file!\n";
     }
 
-    fputs(localFile, file);
+    fputs(fileData, file);
 
     fclose(file);
 
@@ -151,7 +150,7 @@ char* process_request(char* request, int client_sock){
 
     char** command_split = split_str(command, " ");
 
-    if (command_split[0] != "rfs"){
+    if (strcmp(command_split[0] ,"rfs") != 0){
         printf("Invalid command, must start with 'rfs'!\n");
         exit(1);
 

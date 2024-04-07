@@ -12,7 +12,7 @@ char* read_remote(char* remoteFilePath);
 
 char* delete(char* remoteFilePath);
 
-char* process_request(char* request, int client_sock);
+char* process_request(char* request);
 
 
 int run_server();

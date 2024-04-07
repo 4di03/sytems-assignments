@@ -41,6 +41,9 @@ void test_write(){
     assert(string_equal(file_data, "Hello, World!") == 1);
     free(file_data);
 
+    free(write_response);
+    write_response = NULL;
+
     // test on nested file
     write_response = write_remote("Hello, Jim!", "nested/jim.txt");
     assert(string_equal(write_response, "File written successfully to nested/jim.txt!\n"));
@@ -51,6 +54,9 @@ void test_write(){
     assert(string_equal(file_data2, "Hello, Jim!") == 1);
     free(file_data2);
 
+    free(write_response);
+    write_response = NULL;
+
     // test on doubly nested file
     write_response = write_remote("Hello, Jim2!", "nested/jim/jim.txt");
     assert(string_equal(write_response, "File written successfully to nested/jim/jim.txt!\n"));
@@ -60,6 +66,9 @@ void test_write(){
     fclose(file3);
     assert(string_equal(file_data3, "Hello, Jim2!") == 1);
     free(file_data3);
+
+    free(write_response);
+    write_response = NULL;
 }
 
 
@@ -70,13 +79,21 @@ void test_delete(){
 
     assert(fileExists("filesystems/server_fs/test.txt"));
     char* delete_response = delete("test.txt");
+
+
     assert(string_equal(delete_response, "File deleted successfully!\n"));
+
+    free(delete_response);
+    delete_response = NULL;
     assert(!fileExists("filesystems/server_fs/test.txt"));
 
     assert(fileExists("filesystems/server_fs/nested/jim.txt"));
 
     delete_response = delete("nested/jim.txt");
     assert(string_equal(delete_response, "File deleted successfully!\n"));
+
+    free(delete_response);
+    delete_response = NULL;
     assert(!fileExists("filesystems/server_fs/nested/jim.txt"));
 }
 
@@ -88,18 +105,87 @@ void test_read(){
     write_remote("Hello, World!", "test.txt");
     char* read_response = read_remote("test.txt");
 
+
     assert(string_equal(read_response, "File Data:\nHello, World!"));
+
+    free(read_response);
+    read_response = NULL;
 
     write_remote("Hello, Jim!", "nested/jim.txt");
     read_response = read_remote("nested/jim.txt");
     assert(string_equal(read_response, "File Data:\nHello, Jim!"));
+
+    free(read_response);
+    read_response = NULL;
 }
 
 void test_utils(){
 
+    printf("Testing utils . . .");
+
     char words[15] = "Hello, World!\n";
     strip_newline(words);
     assert(string_equal(words, "Hello, World!"));
+
+
+    char* words2 = "GET hi.txt ";
+
+    char** command_split = split_str(words2, " ");
+
+    assert(string_equal(command_split[0], "GET"));
+    assert(string_equal(command_split[1], "hi.txt"));
+    assert(command_split[2] == NULL);
+
+
+}
+
+void test_process_request(){
+    // test process_request
+    clear_filesystems();
+
+
+    char* response;
+
+
+    response = process_request("WRITE server_hi.txt Hello, World!");
+
+    assert(string_equal(response, "File written successfully to server_hi.txt!\n"));
+
+    free(response);
+    response = NULL;
+
+    FILE* file = fopen("filesystems/server_fs/server_hi.txt", "r");
+    char* file_data = malloc(sizeof(char) * MAX_FILE_SIZE);
+    fgets(file_data, MAX_FILE_SIZE, file);
+    fclose(file);
+    assert(string_equal(file_data, "Hello, World!"));
+    free(file_data);
+
+
+    response = process_request("GET server_hi.txt");
+    assert(string_equal(response, "File Data:\nHello, World!"));
+    free(response);
+    response = NULL;
+
+
+
+    assert(fileExists("filesystems/server_fs/server_hi.txt"));
+    response = process_request("RM server_hi.txt");
+    assert(string_equal(response, "File deleted successfully!\n"));
+
+    free(response);
+    response = NULL;
+    assert(!fileExists("filesystems/server_fs/server_hi.txt"));
+
+
+    write_data_to_file("Hello!", "filesystems/server_fs/jims_files/v1/jim.txt");
+
+    response = process_request("GET /jims_files/v1/jim.txt");
+
+    assert(string_equal(response, "File Data:\nHello!"));
+
+
+
 
 
 }
@@ -120,6 +206,16 @@ void test_commands(){
     test_utils();
 
     printf("Command tests passed ✔\n");
+
+    clear_filesystems();
+
+    printf("Testing server commands . . .\n");
+
+
+    test_process_request();
+
+
+    printf("Server command tests passed ✔\n");
 }
 
 
@@ -131,16 +227,16 @@ void test_prepare_message(){
     write_data_to_file("Hello, World!", "filesystems/client_fs/hi.txt");
     
     char* buffer = malloc(sizeof(char) * MAX_COMMAND_SIZE);
-    prepare_message(buffer,"rfs WRITE hi.txt server_hi.txt");
-    assert(string_equal(buffer, "rfs WRITE server_hi.txt Hello, World!"));
+    prepare_message(buffer,"WRITE hi.txt server_hi.txt");
+    assert(string_equal(buffer, "WRITE server_hi.txt Hello, World!"));
     memset(buffer, '\0', MAX_COMMAND_SIZE);
 
-    prepare_message(buffer, "rfs GET server_hi.txt client_hi.txt");
-    assert(string_equal(buffer, "rfs GET server_hi.txt"));
+    prepare_message(buffer, "GET server_hi.txt client_hi.txt");
+    assert(string_equal(buffer, "GET server_hi.txt"));
     memset(buffer, '\0', MAX_COMMAND_SIZE);
 
-    prepare_message(buffer, "rfs RM server_hi.txt");
-    assert(string_equal(buffer, "rfs RM server_hi.txt"));
+    prepare_message(buffer, "RM server_hi.txt");
+    assert(string_equal(buffer, "RM server_hi.txt"));
     memset(buffer, '\0', MAX_COMMAND_SIZE);
 
     prepare_message(buffer,"exit");
@@ -152,34 +248,34 @@ void test_prepare_message(){
     assert(string_equal(buffer, "exit"));
     memset(buffer, '\0', MAX_COMMAND_SIZE);
 
-    prepare_message(buffer, "rfs GET hi.txt\n");
-    assert(string_equal(buffer, "rfs GET hi.txt"));
+    prepare_message(buffer, "GET hi.txt\n");
+    assert(string_equal(buffer, "GET hi.txt"));
     memset(buffer, '\0', MAX_COMMAND_SIZE);
 
-    prepare_message(buffer, "rfs RM hi.txt\n");
-    assert(string_equal(buffer, "rfs RM hi.txt"));
+    prepare_message(buffer, "RM hi.txt\n");
+    assert(string_equal(buffer, "RM hi.txt"));
     memset(buffer, '\0', MAX_COMMAND_SIZE);
 
 }
 
 
 void test_validate_message(){
-    assert(validate_message("rfs WRITE hi.txt server_hi.txt\n") == 1);
-    assert(validate_message("rfs GET server_hi.txt client_hi.txt\n") == 1);
-    assert(validate_message("rfs WRITE hi.txt\n") == 1);
-    assert(validate_message("rfs GET server_hi.txt") == 1);
-    assert(validate_message("rfs RM server_hi.txt") == 1);
+    assert(validate_message("WRITE hi.txt server_hi.txt\n") == 1);
+    assert(validate_message("GET server_hi.txt client_hi.txt\n") == 1);
+    assert(validate_message("WRITE hi.txt\n") == 1);
+    assert(validate_message("GET server_hi.txt") == 1);
+    assert(validate_message("RM server_hi.txt") == 1);
     assert(validate_message("exit") == 1);
     assert(validate_message("exit\n") == 1);
 
-    assert(validate_message("rfs RM priv/b.txt\n"));
+    assert(validate_message("RM priv/b.txt\n"));
 
 
     assert(validate_message("dummy command") == 0);
-    assert(validate_message("rfs dummy command") == 0);
-    assert(validate_message("rfs WRITE") == 0);
-    assert(validate_message("rfs GET") == 0);
-    assert(validate_message("rfs RM") == 0);
+    assert(validate_message("dummy command") == 0);
+    assert(validate_message("WRITE") == 0);
+    assert(validate_message("GET") == 0);
+    assert(validate_message("RM") == 0);
     assert(validate_message("rfs") == 0);
     assert(validate_message("") == 0);
     assert(validate_message("rf\ns WRITE hi.txt server_hi.txt") == 0);
@@ -213,7 +309,7 @@ void test_remote_write(char* localText, char* localFile , char* remoteFile){
 
     char* command = malloc(sizeof(char) * MAX_COMMAND_SIZE);
 
-    snprintf(command, MAX_COMMAND_SIZE, "rfs WRITE %s %s", localFile, passedRemoteFile);
+    snprintf(command, MAX_COMMAND_SIZE, "WRITE %s %s", localFile, passedRemoteFile);
 
     assert(run_client(command) == 0);
 
@@ -245,7 +341,7 @@ void test_remote_get(char* remoteText, char* remoteFile, char* localFile){
 
     char* command = malloc(sizeof(char) * MAX_COMMAND_SIZE);
 
-    snprintf(command, MAX_COMMAND_SIZE, "rfs GET %s %s", remoteFile, passedLocalFile);
+    snprintf(command, MAX_COMMAND_SIZE, "GET %s %s", remoteFile, passedLocalFile);
 
     assert(run_client(command) == 0);
 
@@ -266,7 +362,7 @@ void test_remote_delete(){
 
     assert(fileExists("filesystems/server_fs/server_hi.txt"));
 
-    assert(run_client("rfs RM server_hi.txt") == 0);
+    assert(run_client("RM server_hi.txt") == 0);
 
     assert(!fileExists("filesystems/server_fs/server_hi.txt"));
 }
@@ -313,7 +409,7 @@ void test_server(){
 
     assert(run_client("dummy command") == 1);
 
-    assert(run_client("rfs dummy command") == 1);
+    assert(run_client("dummy command") == 1);
 
     assert(run_client("exit") == 0); // exit the client and server.
 
@@ -337,6 +433,7 @@ void test_server(){
 
 
 }
+
 
 
 

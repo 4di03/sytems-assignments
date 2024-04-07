@@ -73,8 +73,8 @@ char* read_remote(char* remoteFilePath){
 
     FILE* file = fopen(get_actual_fp(remoteFilePath,1), "r");
     if (file == NULL){
-        printf("Error opening file!\n");
-        exit(1);
+        printf("[Server] Error opening file!\n");
+        return strdup("Error opening file!\n");
     }
 
     char* file_data = malloc(sizeof(char) * MAX_FILE_SIZE);
@@ -97,42 +97,38 @@ char* delete(char* remoteFilePath){
     */
 
     if (remove(get_actual_fp(remoteFilePath, 1)) != 0){
-        return "Error deleting file!\n";
+        return strdup("Error deleting file!\n");
     }
 
-    return "File deleted successfully!\n";
+    return strdup("File deleted successfully!\n");
 }
 
-char* process_request(char* request, int client_sock){
+char* process_request(char* request){
     /**
      * Helper to process command from client on the serverside.
      * 
      * Args:
      * command (char*): command from client
-     * client_sock (int): client socket
      * 
      * returns:
      * char*: response message
      * 
+     * 
+     * RESPONSE MUST BE FREED AFTER USE
     */
 
     strip_newline(request);
 
     char** command_split = split_str(request, " ");
 
-    if (! string_equal(command_split[0] ,"rfs")){
-        printf("Invalid command, must start with 'rfs'!\n");
-        exit(1);
+    if (string_equal(command_split[0] , "WRITE")){
+        // request should be in form WRITE <remote_file_path> <file_data>
 
-    }
-    if (string_equal(command_split[1] , "WRITE")){
-        // request should be in form rfs WRITE <remote_file_path> <file_data?
-
-        char* remoteFilePath = command_split[2];
+        char* remoteFilePath = command_split[1];
 
         char* remaining_data = malloc(sizeof(char) * MAX_FILE_SIZE);
 
-        int j = 3;
+        int j = 2;
         while (command_split[j] != NULL){
             strcat(remaining_data, command_split[j]);
             j++;
@@ -143,18 +139,18 @@ char* process_request(char* request, int client_sock){
         
         return write_remote(remaining_data, remoteFilePath);
 
-    }else if (string_equal(command_split[1], "GET")){
-        // request should be in form rfs GET <remote_file_path> 
+    }else if (string_equal(command_split[0], "GET")){
+        // request should be in form GET <remote_file_path> 
 
-        return read_remote(command_split[2]);
+        return read_remote(command_split[1]);
 
-    } else if (string_equal(command_split[1] , "RM")){
-        // request should be in form rfs RM <remote_file_path> 
+    } else if (string_equal(command_split[0] , "RM")){
+        // request should be in form RM <remote_file_path> 
 
-        return delete(command_split[2]);
+        return delete(command_split[1]);
 
     } else {
-        return "Invalid command! The command after RFS should be one of WRITE, GET, or RM\n";
+        return strdup("Invalid command! The command after should be one of WRITE, GET, or RM\n");
     }
 
 
@@ -190,6 +186,7 @@ int connect_to_client(int socket_desc){
 
 
 int run_server(){
+
 
   if (signal(SIGINT, sigint_handler) == SIG_ERR){
     printf("Error while setting signal handler\n");
@@ -243,10 +240,16 @@ int run_server(){
   if (recv(client_sock, client_message, 
            sizeof(client_message), 0) < 0){
     printf("[Server] Couldn't receive\n");
-    close(socket_desc);
     close(client_sock);
-    return -1;
+    continue; // does not close the server
   }
+
+  if (client_message == NULL){
+    printf("[Server] Client message is NULL\n");
+    close(client_sock);
+    continue; // does not close the server
+  }
+
   printf("[Server] Recieved message from client: %s\n", client_message);
 
   if (string_equal(client_message, "exit\n") || string_equal(client_message, "exit")){
@@ -254,14 +257,12 @@ int run_server(){
   }
 
   // Process the request:
-  char* server_message = process_request(client_message, client_sock);
+  char* server_message = process_request(client_message);
   
   if (send(client_sock, server_message, strlen(server_message), 0) < 0){
     printf("[Server] Can't send\n");
-    close(socket_desc);
     close(client_sock);
-    return -1;
-
+    continue; // does not close the server
   }
 
 

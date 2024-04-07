@@ -47,6 +47,8 @@ char* write_remote(char* fileData, char* remoteFilePath){
 
    char* fp = get_actual_fp(remoteFilePath, 1);
 
+   strip_newline(fp); // remove newline character from file path
+
     write_data_to_file(fileData, fp);
 
     char* out_message = malloc(sizeof(char) * MAX_COMMAND_SIZE);
@@ -114,19 +116,9 @@ char* process_request(char* request, int client_sock){
      * 
     */
 
+    strip_newline(request);
 
-    int i = 0;
-    char* command = malloc(sizeof(char) * MAX_COMMAND_SIZE);
-
-    while (request[i] != '\n' && request[i] != '\0'){
-        command[i] = request[i];
-        i++;
-    }
-
-    command[i] = '\0';
-    command = realloc(command, sizeof(char) * (i+1));
-
-    char** command_split = split_str(command, " ");
+    char** command_split = split_str(request, " ");
 
     if (! string_equal(command_split[0] ,"rfs")){
         printf("Invalid command, must start with 'rfs'!\n");
@@ -215,7 +207,7 @@ int run_server(){
     printf("Error while creating socket\n");
     return -1;
   }
-  printf("Socket created successfully\n");
+  printf("[Server] Socket created successfully\n");
   
   // Set port and IP:
   server_addr.sin_family = AF_INET;

@@ -7,6 +7,24 @@
 #include <libgen.h>
 #include "utils.h"
 
+
+void strip_newline(char* str){
+  /**
+   * Strip last newline character from string.
+   * 
+   * Args:
+   * str (char*): string to strip newline from
+  */
+    int i = -1;
+    while (str[++i] != '\0'){
+    }
+
+    if (str[i-1] == '\n'){ // only strip LAST newline character
+        str[i-1] = '\0';
+    }
+  return;
+}
+
 int string_equal(char* str1, char* str2){
   /**
    * Compares strings even if their buffer sizes are different.

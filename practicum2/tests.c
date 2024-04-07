@@ -95,6 +95,15 @@ void test_read(){
     assert(string_equal(read_response, "File Data:\nHello, Jim!"));
 }
 
+void test_utils(){
+
+    char words[15] = "Hello, World!\n";
+    strip_newline(words);
+    assert(string_equal(words, "Hello, World!"));
+
+
+}
+
 void test_commands(){
     clear_filesystems();
 
@@ -107,6 +116,8 @@ void test_commands(){
     test_delete();
 
     test_read();
+
+    test_utils();
 
     printf("Command tests passed ✔\n");
 }
@@ -141,17 +152,27 @@ void test_prepare_message(){
     assert(string_equal(buffer, "exit"));
     memset(buffer, '\0', MAX_COMMAND_SIZE);
 
+    prepare_message(buffer, "rfs GET hi.txt\n");
+    assert(string_equal(buffer, "rfs GET hi.txt"));
+    memset(buffer, '\0', MAX_COMMAND_SIZE);
+
+    prepare_message(buffer, "rfs RM hi.txt\n");
+    assert(string_equal(buffer, "rfs RM hi.txt"));
+    memset(buffer, '\0', MAX_COMMAND_SIZE);
+
 }
 
 
 void test_validate_message(){
-    assert(validate_message("rfs WRITE hi.txt server_hi.txt") == 1);
-    assert(validate_message("rfs GET server_hi.txt client_hi.txt") == 1);
-    assert(validate_message("rfs WRITE hi.txt") == 1);
+    assert(validate_message("rfs WRITE hi.txt server_hi.txt\n") == 1);
+    assert(validate_message("rfs GET server_hi.txt client_hi.txt\n") == 1);
+    assert(validate_message("rfs WRITE hi.txt\n") == 1);
     assert(validate_message("rfs GET server_hi.txt") == 1);
     assert(validate_message("rfs RM server_hi.txt") == 1);
     assert(validate_message("exit") == 1);
     assert(validate_message("exit\n") == 1);
+
+    assert(validate_message("rfs RM priv/b.txt\n"));
 
 
     assert(validate_message("dummy command") == 0);

@@ -3,7 +3,7 @@ int string_equal(char* str1, char* str2);
 
 char* get_actual_fp(char* filePath, int remote);
 
-
+void strip_newline(char* str);
 char** split_str(char* str, char* delim);
 
 int directory_exists(char* dirPath);

@@ -7,12 +7,16 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-void  prepare_message(char* buffer,  char* raw_message) {
+void  prepare_message(char* buffer,  char* tmp_message) {
   /**
    * Converts the raw message given by the client to one that can be processed
    * by the server.
    * 
    */
+
+  char* raw_message = strdup(tmp_message); // copy this to make it not a string literal
+
+  strip_newline(raw_message);
   char** message_split = split_str(raw_message, " ");
 
   char* message;
@@ -103,11 +107,6 @@ void handle_response(char* server_message, char* client_message) {
    */
   char** command_split = split_str(client_message, " ");
 
-  if (command_split[1] == NULL) {
-    printf("[Client] Invalid command\n");
-    return;
-  }
-
   if (string_equal(command_split[1], "WRITE")) {
     printf("[Client] Attempted to write %s to remote location : %s\n",
            command_split[2], command_split[3]);
@@ -123,8 +122,9 @@ void handle_response(char* server_message, char* client_message) {
       localFilePath = command_split[3];
     }
 
+    
 
-        int i = 0;
+    int i = 0;
     int j =0;
     char* buffer = malloc(sizeof(char) * MAX_FILE_SIZE);
     while (server_message[i] != '\0') {
@@ -142,13 +142,16 @@ void handle_response(char* server_message, char* client_message) {
 
     buffer[j] = '\0';
 
-    write_data_to_file(buffer, get_actual_fp(localFilePath, 0));
+    char* actualLocalFilePath = get_actual_fp(localFilePath, 0);
 
-    
+    strip_newline(actualLocalFilePath); // makes sure we don't have a newline at the end of the file path
+    write_data_to_file(buffer, actualLocalFilePath);
+
+
     printf("[Client] File from remote (%s) written to %s\n", remoteFilePath,
            localFilePath);
 
-  } else if (command_split[1] == "RM") {
+  } else if (string_equal(command_split[1] ,"RM")) {
 
     printf("[Client] Attempted to remove file at remote location : %s\n",
            command_split[2]);
@@ -162,7 +165,7 @@ void handle_response(char* server_message, char* client_message) {
   free(command_split);
 }
 
-int run_client(char* given_command) {
+int run_client(char* raw_command) {
   /**
    *
    * Runs an instance of the client.
@@ -170,6 +173,14 @@ int run_client(char* given_command) {
    * args:
    * given_command (char*): command to run, if NULL, will prompt user for input.
    */
+
+
+
+
+  char* given_command = raw_command != NULL ? strdup(raw_command) : NULL; // free this to make it not a string literal
+
+
+
   int socket_desc;
   struct sockaddr_in server_addr;
   char server_message[2000], raw_message[2000];
@@ -216,7 +227,7 @@ int run_client(char* given_command) {
         return -1;
       }
 
-      printf("Socket created successfully\n");
+      printf("[Client] Socket created successfully\n");
 
       // Set port and IP the same as server-side:
       server_addr.sin_family = AF_INET;
@@ -256,7 +267,7 @@ int run_client(char* given_command) {
     if (string_equal(raw_message, "exit\n") ||
         string_equal(raw_message, "exit")) {
       close(socket_desc);
-      printf("Closing the client !\n");
+      printf("[Client] Closing the client !\n");
       break;
     }
 

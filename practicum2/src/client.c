@@ -6,8 +6,8 @@
  */
 
 
-#include "src/client_commands.h"
-#include "src/constants.h"
+#include "client_commands.h"
+#include "constants.h"
 #include <stdlib.h>
 #include <string.h>
 

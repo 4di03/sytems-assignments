@@ -14,7 +14,7 @@
 */
 
 
-#include "src/server_commands.h"
+#include "server_commands.h"
 
 
 int main(void)

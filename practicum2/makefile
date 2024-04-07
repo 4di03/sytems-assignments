@@ -1,10 +1,10 @@
 all: server client tests
 
-server: server.c src/server_commands.c src/constants.h src/utils.c 
-	gcc server.c src/server_commands.c src/constants.h src/utils.c -o exec/server 
+server: src/server.c src/server_commands.c src/constants.h src/utils.c 
+	gcc src/server.c src/server_commands.c src/constants.h src/utils.c -o exec/server 
 
-client: client.c src/client_commands.c src/constants.h src/utils.c 
-	gcc client.c src/client_commands.c src/constants.h src/utils.c -o rfs
+client: src/client.c src/client_commands.c src/constants.h src/utils.c 
+	gcc src/client.c src/client_commands.c src/constants.h src/utils.c -o rfs
 
-tests: tests.c src/server_commands.c src/client_commands.c src/constants.h src/utils.c
-	gcc tests.c src/server_commands.c src/client_commands.c src/constants.h src/utils.c -o exec/tests
+tests: src/tests.c src/server_commands.c src/client_commands.c src/constants.h src/utils.c
+	gcc src/tests.c src/server_commands.c src/client_commands.c src/constants.h src/utils.c -o exec/tests

@@ -1,7 +1,7 @@
-#include "src/server_commands.h"
-#include "src/client_commands.h"
-#include "src/utils.h"
-#include "src/constants.h"
+#include "server_commands.h"
+#include "client_commands.h"
+#include "utils.h"
+#include "constants.h"
 #include "assert.h"
 #include <unistd.h>
 #include <stdlib.h>
@@ -435,6 +435,17 @@ void test_server(){
 }
 
 
+void test_concurrency(){
+    clear_filesystems();
+    printf("Testing server's ability to handle concurrent requests . . .\n");
+
+
+    exit(1);
+
+
+    printf("Concurrency test passed ✔\n");
+}
+
 
 
 int main(){
@@ -442,6 +453,8 @@ int main(){
     test_commands();    
     test_client_commands(); 
     test_server();
+
+    test_concurrency();
 
     return 0;
 }

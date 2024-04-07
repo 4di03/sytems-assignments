@@ -8,6 +8,41 @@
 #include "utils.h"
 
 
+
+
+void generate_random_file(char* filePath, int size){
+  /**
+   * Generate a text file with random alphanumeric characters  at the specified file path.
+   * 
+   * Args:
+   * filePath (char*): path to file
+   * size (int): size of file in MB
+  */
+
+  FILE* file = fopen(filePath, "w");
+
+  if (file == NULL){
+    printf("Error opening file!\n");
+    exit(1);
+  }
+
+  char* randomChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\n";
+
+  for (int i = 0; i < size; i++){
+    for (int j = 0; j < 1024 * 1024; j++){
+      fputc(randomChars[rand() % 63], file);
+    }
+  }
+
+  fclose(file);
+
+  printf("File %s of size %d MB created successfully!\n", filePath, size);
+
+  return;
+
+
+}
+
 void strip_newline(char* str){
   /**
    * Strip last newline character from string.

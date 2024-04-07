@@ -6,9 +6,9 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <signal.h>
 #include <sys/wait.h>
 #include <string.h>
-
 
 void clear_filesystems(){
     /**
@@ -36,7 +36,7 @@ void test_write(){
     assert(string_equal(write_response, "File written successfully to test.txt!\n"));
     FILE* file = fopen("filesystems/server_fs/test.txt", "r");
     char* file_data = malloc(sizeof(char) * MAX_FILE_SIZE);
-    fgets(file_data, MAX_FILE_SIZE, file);
+    fread(file_data,sizeof(char), MAX_FILE_SIZE, file);
     fclose(file);
     assert(string_equal(file_data, "Hello, World!") == 1);
     free(file_data);
@@ -49,7 +49,7 @@ void test_write(){
     assert(string_equal(write_response, "File written successfully to nested/jim.txt!\n"));
     FILE* file2 = fopen("filesystems/server_fs/nested/jim.txt", "r");
     char* file_data2 = malloc(sizeof(char) * MAX_FILE_SIZE);
-    fgets(file_data2, MAX_FILE_SIZE, file);
+    fread(file_data2, sizeof(char), MAX_FILE_SIZE, file);
     fclose(file2);
     assert(string_equal(file_data2, "Hello, Jim!") == 1);
     free(file_data2);
@@ -62,7 +62,7 @@ void test_write(){
     assert(string_equal(write_response, "File written successfully to nested/jim/jim.txt!\n"));
     FILE* file3 = fopen("filesystems/server_fs/nested/jim/jim.txt", "r");
     char* file_data3 = malloc(sizeof(char) * MAX_FILE_SIZE);
-    fgets(file_data3, MAX_FILE_SIZE, file3);
+    fread(file_data3, sizeof(char), MAX_FILE_SIZE, file3);
     fclose(file3);
     assert(string_equal(file_data3, "Hello, Jim2!") == 1);
     free(file_data3);
@@ -156,7 +156,7 @@ void test_process_request(){
 
     FILE* file = fopen("filesystems/server_fs/server_hi.txt", "r");
     char* file_data = malloc(sizeof(char) * MAX_FILE_SIZE);
-    fgets(file_data, MAX_FILE_SIZE, file);
+    fread(file_data, sizeof(char), MAX_FILE_SIZE, file);
     fclose(file);
     assert(string_equal(file_data, "Hello, World!"));
     free(file_data);
@@ -316,7 +316,7 @@ void test_remote_write(char* localText, char* localFile , char* remoteFile){
 
     FILE* file = fopen(get_actual_fp(remoteFile, 1), "r");
     char* file_data = malloc(sizeof(char) * MAX_FILE_SIZE);
-    fgets(file_data, MAX_FILE_SIZE, file);
+    fread(file_data, sizeof(char),MAX_FILE_SIZE, file);
     fclose(file);
     assert(string_equal(file_data, localText));
 
@@ -347,7 +347,7 @@ void test_remote_get(char* remoteText, char* remoteFile, char* localFile){
 
     FILE* file = fopen(get_actual_fp(localFile, 0), "r");
     char* file_data = malloc(sizeof(char) * MAX_FILE_SIZE);
-    fgets(file_data, MAX_FILE_SIZE, file);
+    fread(file_data, sizeof(char),MAX_FILE_SIZE, file);
     fclose(file);
     assert(string_equal(file_data, remoteText));
 
@@ -374,6 +374,8 @@ void test_server(){
     // tests that the client can execute commands on the server
     printf("Testing server . . .\n");
 
+
+    pid_t parent_pid = getpid();
     int pid = fork();
 
     if (pid == 0){
@@ -381,8 +383,15 @@ void test_server(){
     if (run_server() != 0){
         printf("Error starting server\n");
 
-        exit(1);
+        printf("Killing parent process . . .\n");
+
+        // kill parent process
+        kill(parent_pid, SIGKILL);
+
+        exit(EXIT_FAILURE);
     }
+    exit(EXIT_SUCCESS);
+
     }else{
     sleep(1); // wait for server to start
 
@@ -391,7 +400,10 @@ void test_server(){
 
     test_remote_write("Hello, World!", "hi.txt", "server_hi.txt");
 
-    test_remote_write("Hello, Jim!", "v1/jim.txt", "/jims_files/v1/jim.txt");
+
+    test_remote_write("Hello, Jim", "v1/jim.txt", "/jims_files/v1/jim.txt"); 
+
+    test_remote_write("Hello, Jim\nHello Bob!", "v1/jim.txt", "/bobs_files/v1/jim.txt"); // testing case where there are 2 lines
 
     test_remote_write("Hello, Jim_missing_remote!", "v1/jim.txt", NULL);
 
@@ -401,6 +413,9 @@ void test_server(){
     test_remote_get("Hello, Jim!", "/jims_files/v1/jim.txt", "client_jim.txt");
 
     test_remote_get("Hello, Jim_missing_local!", "/jims_files/v1/jim.txt", NULL);
+
+    test_remote_get("Hello, Jim!\n Hello Bob!", "/jims_files/v1/jim.txt", "client_jim.txt"); // testing read with 2 lines
+ 
 
     clear_filesystems(); // clear filesystems before running tests
 
@@ -440,9 +455,118 @@ void test_concurrency(){
     printf("Testing server's ability to handle concurrent requests . . .\n");
 
 
-    exit(1);
+    pid_t parent_pid = getpid();
 
 
+    int server_pid  = fork();
+
+    if (server_pid == 0){
+        printf("Starting server . . .\n");
+        if (run_server() != 0){
+            printf("Error starting server\n");
+
+
+            printf("Killing parent process . . .\n");
+            // kill parent process
+            kill(parent_pid, SIGKILL);
+            exit(EXIT_FAILURE);
+        }
+
+        exit(EXIT_SUCCESS);
+
+    } else{
+        sleep(1); // wait for server to start
+
+    }
+
+
+    generate_random_file("filesystems/client_fs/hi.txt", FILE_SIZE_MB); // create a random <N> MB file to write to the server
+    
+    int num_processes = NUM_CONCURRENT_REQUESTS;
+    pid_t pids[num_processes];
+    // create 10 child processes to send requests to the server concurrently
+    for (int i = 0 ; i < num_processes; i++){
+        pids[i] = fork();
+        if (pids[i] == 0){
+            // child process
+
+            char* command = malloc(sizeof(char) * MAX_COMMAND_SIZE);
+            snprintf(command, MAX_COMMAND_SIZE, "WRITE hi.txt server_hi_%d.txt", i);
+
+            if (run_client(command) != 0){
+                printf("Error running client\n");
+                exit(EXIT_FAILURE);
+            }
+            exit(EXIT_SUCCESS); // so that the child process doesn't keep forking
+        }
+    }
+
+
+    // Parent process waits for all child processes to terminate, to make sure all processes ended successfully
+    int success = 1;
+    for (int i = 0; i < num_processes; i++) {
+        int status;
+        waitpid(pids[i], &status, 0);
+
+
+
+        assert(WIFEXITED(status));
+
+        int exit_status = WEXITSTATUS(status);
+        if (exit_status != EXIT_SUCCESS){
+            printf("Child process %d exited with status %d\n", pids[i], exit_status);
+            success = 0;
+        }else{
+            printf("Child process %d succeeded!\n", pids[i]);
+        }
+
+    }
+
+    if (success){
+        printf("All child processes succeeded!\n");
+    }else{
+        printf("Some child processes failed\n");
+        exit(1);
+    }
+
+    printf("Closing the server . . .\n");
+    // kill the server 
+    if(run_client("exit") != 0){
+        printf("Error closing server\n");
+        exit(1);
+    }
+
+    waitpid(server_pid, NULL, 0); // wait for server to close
+
+
+
+    // verify that the files written to the server are correct
+
+    for (int i = 0; i < num_processes; i++){
+
+
+        char* remoteFileName = malloc(sizeof(char) * MAX_COMMAND_SIZE);
+        snprintf(remoteFileName, MAX_COMMAND_SIZE, "server_hi_%d.txt", i);
+
+        FILE* remoteFile = fopen(get_actual_fp(remoteFileName, 1), "r");
+        char* remoteFileData = malloc(sizeof(char) * MAX_FILE_SIZE);
+        fread(remoteFileData, sizeof(char),MAX_FILE_SIZE, remoteFile);
+        fclose(remoteFile);
+
+        FILE* localFile = fopen("filesystems/client_fs/hi.txt", "r");
+        char* localFileData = malloc(sizeof(char) * MAX_FILE_SIZE);
+
+        fread(localFileData, sizeof(char), MAX_FILE_SIZE, localFile);
+
+        assert(string_equal(remoteFileData, localFileData));
+
+        fclose(localFile);
+
+        free(localFileData);
+        free(remoteFileData);
+    }
+
+    //clear_filesystems();
     printf("Concurrency test passed ✔\n");
 }
 

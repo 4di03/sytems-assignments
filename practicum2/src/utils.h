@@ -12,3 +12,5 @@ void make_parent_dirs(char* filePath);
 
 
 char* write_data_to_file(char* fileData, char* filePath);
+
+void generate_random_file(char* filePath, int size);

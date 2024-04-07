@@ -78,7 +78,7 @@ char* read_remote(char* remoteFilePath){
     }
 
     char* file_data = malloc(sizeof(char) * MAX_FILE_SIZE);
-    fgets(file_data, MAX_FILE_SIZE, file);
+    fread(file_data, sizeof(char),MAX_FILE_SIZE, file);
 
     fclose(file);
 
@@ -199,6 +199,10 @@ int run_server(){
     
   // Create socket:
   socket_desc = socket(AF_INET, SOCK_STREAM, 0);
+
+  int _enable = 1;
+  setsockopt(socket_desc, SOL_SOCKET, SO_REUSEADDR, &_enable, sizeof(_enable)); // allow reuse of port
+
   
   if(socket_desc < 0){
     printf("Error while creating socket\n");

@@ -38,7 +38,7 @@ void prepare_message(char* buffer, char* tmp_message) {
 
     char* actualFilePath = get_actual_fp(localFilePath, 0);
 
-    char* fileData = malloc(sizeof(char) * MAX_FILE_SIZE);
+    char* fileData = calloc(MAX_FILE_SIZE, sizeof(char));
 
     FILE* actualFile = fopen(actualFilePath, "r");
 
@@ -47,7 +47,7 @@ void prepare_message(char* buffer, char* tmp_message) {
       return;
     }
 
-    fgets(fileData, MAX_FILE_SIZE, actualFile);
+    fread(fileData, sizeof(char), MAX_FILE_SIZE, actualFile);
 
     fclose(actualFile);
     char* response = malloc(sizeof(char) * MAX_COMMAND_SIZE);

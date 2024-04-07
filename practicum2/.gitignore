@@ -1,0 +1,3 @@
+test_data/*
+filesystems/client_fs/*
+filesystems/server_fs/*

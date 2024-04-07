@@ -117,9 +117,14 @@ void handle_response(char* server_message, char* client_message) {
    */
   char** command_split = split_str(client_message, " ");
 
+
   if (string_equal(command_split[0], "WRITE")) {
+
+    char* localFilePath = command_split[1];
+    char* remoteFilePath = command_split[2] == NULL ? localFilePath : command_split[2];
+
     printf("[Client] Attempted to write %s to remote location : %s\n",
-           command_split[1], command_split[2]);
+           localFilePath, remoteFilePath);
 
     printf("[Client] Server Response: %s\n", server_message);
   } else if (string_equal(command_split[0], "GET")) {

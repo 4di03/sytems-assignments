@@ -521,7 +521,7 @@ void test_concurrency(){
     }
 
 
-    generate_random_file("filesystems/client_fs/hi.txt", FILE_SIZE_MB); // create a random <N> MB file to write to the server
+    generate_random_file("filesystems/client_fs/hi.txt", MAX_FILE_SIZE); // create a random <N> MB file to write to the server
     
     int num_processes = NUM_CONCURRENT_REQUESTS;
     pid_t pids[num_processes];

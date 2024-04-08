@@ -199,7 +199,9 @@ int run_client(char* raw_command) {
 
   int socket_desc;
   struct sockaddr_in server_addr;
-  char server_message[MAX_COMMAND_SIZE], raw_message[MAX_COMMAND_SIZE];
+
+  char* server_message = calloc(MAX_COMMAND_SIZE, sizeof(char));
+  char* raw_message = calloc(MAX_COMMAND_SIZE, sizeof(char));
 
   int state = 0;
 
@@ -290,8 +292,11 @@ int run_client(char* raw_command) {
     close(socket_desc);
     return -1;
   }
+  
+  if (! string_equal(client_message, "exit")) {
 
-  // Receive the server's response:
+
+  // Receive the server's response if the message is not exit
   if (receive_all(socket_desc, server_message, messageLen) < 0) {
     printf("Error while receiving server's msg\n");
     close(socket_desc);
@@ -299,6 +304,8 @@ int run_client(char* raw_command) {
   }
 
   handle_response(server_message, raw_message);
+
+  }
 
   printf("[Client] exiting program!\n");
 

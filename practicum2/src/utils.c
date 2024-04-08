@@ -44,7 +44,7 @@ long send_all(int s, char *buf, long len)
         total += n;
 
 
-        if (iter++ % 100 == 0){
+        if (iter++ % 1000 == 0){
             printf("Sent %ld bytes\n", total);
         }
 
@@ -83,7 +83,7 @@ long receive_all(int s, char *buf, long len) {
 
         total += n;
 
-        if(iter++ % 100 == 0){
+        if(iter++ % 1000 == 0){
         printf("Received %ld bytes\n", total);
         }
     } // if n is equal to the chunk size, it means there is more data to be read
@@ -99,7 +99,7 @@ void generate_random_file(char* filePath, int size){
    * 
    * Args:
    * filePath (char*): path to file
-   * size (int): size of file in MB
+   * size (int): size of file in bytes
   */
 
   FILE* file = fopen(filePath, "w");
@@ -112,9 +112,8 @@ void generate_random_file(char* filePath, int size){
   char* randomChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\n";
 
   for (int i = 0; i < size; i++){
-    for (int j = 0; j < 1024 * 1024; j++){
-      fputc(randomChars[rand() % 63], file);
-    }
+    fputc(randomChars[rand() % 63], file);
+    
   }
 
   fclose(file);

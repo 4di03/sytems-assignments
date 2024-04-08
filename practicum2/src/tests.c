@@ -563,12 +563,6 @@ void test_concurrency(){
 
     }
 
-    if (success){
-        printf("All child processes succeeded!\n");
-    }else{
-        printf("Some child processes failed\n");
-        exit(1);
-    }
 
     printf("Closing the server . . .\n");
     // kill the server 
@@ -578,6 +572,14 @@ void test_concurrency(){
     }
 
     waitpid(server_pid, NULL, 0); // wait for server to close
+
+
+    if (success){
+        printf("All child processes succeeded!\n");
+    }else{
+        printf("Some child processes failed\n");
+        exit(1);
+    }
 
 
 

@@ -9,7 +9,7 @@
 #include <sys/socket.h>
 #include <errno.h>
 #include <unistd.h>
-
+#include "constants.h"
 int min(int a, int b){
   /**
    * Returns the minimum of two integers.
@@ -44,15 +44,16 @@ long send_all(int s, char *buf, long len)
         total += n;
 
 
-        if (iter++ % 1000 == 0){
+        if (iter++ % 1000 == 0 && DEBUG){
             printf("Sent %ld bytes\n", total);
         }
 
     }
 
-    printf("Total sent %ld bytes\n", total);
+    if (DEBUG)
+      printf("Total sent %ld bytes\n", total);
 
-    if (n == -1 || total < len) {
+    if (n == -1 || total < len && DEBUG) {
         printf("Have %ld bytes left to send\n", len - total);
         return -1; // return -1 on failure, 0 on success
     }else{
@@ -83,12 +84,13 @@ long receive_all(int s, char *buf, long len) {
 
         total += n;
 
-        if(iter++ % 1000 == 0){
+        if(iter++ % 1000 == 0 && DEBUG){
         printf("Received %ld bytes\n", total);
         }
     } // if n is equal to the chunk size, it means there is more data to be read
 
-    printf("Total recieved %ld bytes\n", total);
+    if (DEBUG)
+      printf("Total recieved %ld bytes\n", total);
 
 
     return (total > 0) ? total : -1; // return -1 on failure, 0 on success

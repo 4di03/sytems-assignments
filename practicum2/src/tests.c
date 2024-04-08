@@ -35,7 +35,7 @@ void test_write(){
     char* write_response = write_remote("Hello, World!", "test.txt");
     assert(string_equal(write_response, "File written successfully to test.txt!\n"));
     FILE* file = fopen("filesystems/server_fs/test.txt", "r");
-    char* file_data = malloc(sizeof(char) * MAX_FILE_SIZE);
+    char* file_data = calloc(MAX_FILE_SIZE, sizeof(char));
     fread(file_data,sizeof(char), MAX_FILE_SIZE, file);
     fclose(file);
     assert(string_equal(file_data, "Hello, World!") == 1);
@@ -48,7 +48,7 @@ void test_write(){
     write_response = write_remote("Hello, Jim!", "nested/jim.txt");
     assert(string_equal(write_response, "File written successfully to nested/jim.txt!\n"));
     FILE* file2 = fopen("filesystems/server_fs/nested/jim.txt", "r");
-    char* file_data2 = malloc(sizeof(char) * MAX_FILE_SIZE);
+    char* file_data2 = calloc(MAX_FILE_SIZE, sizeof(char));
     fread(file_data2, sizeof(char), MAX_FILE_SIZE, file);
     fclose(file2);
     assert(string_equal(file_data2, "Hello, Jim!") == 1);
@@ -61,7 +61,7 @@ void test_write(){
     write_response = write_remote("Hello, Jim2!", "nested/jim/jim.txt");
     assert(string_equal(write_response, "File written successfully to nested/jim/jim.txt!\n"));
     FILE* file3 = fopen("filesystems/server_fs/nested/jim/jim.txt", "r");
-    char* file_data3 = malloc(sizeof(char) * MAX_FILE_SIZE);
+    char* file_data3 = calloc(MAX_FILE_SIZE, sizeof(char));
     fread(file_data3, sizeof(char), MAX_FILE_SIZE, file3);
     fclose(file3);
     assert(string_equal(file_data3, "Hello, Jim2!") == 1);
@@ -147,6 +147,20 @@ void test_process_request(){
     char* response;
 
 
+    write_data_to_file("Hello, World!", "filesystems/server_fs/delete.txt");
+
+    assert(fileExists("filesystems/server_fs/delete.txt"));
+
+    response = process_request("RM delete.txt");
+
+    assert(string_equal(response, "File deleted successfully!\n"));
+
+    assert(!fileExists("filesystems/server_fs/delete.txt"));
+
+    free(response);
+    response = NULL;
+
+
     response = process_request("WRITE server_hi.txt Hello, World!");
 
     assert(string_equal(response, "File written successfully to server_hi.txt!\n"));
@@ -155,7 +169,7 @@ void test_process_request(){
     response = NULL;
 
     FILE* file = fopen("filesystems/server_fs/server_hi.txt", "r");
-    char* file_data = malloc(sizeof(char) * MAX_FILE_SIZE);
+    char* file_data = calloc(MAX_FILE_SIZE,sizeof(char));
     fread(file_data, sizeof(char), MAX_FILE_SIZE, file);
     fclose(file);
     assert(string_equal(file_data, "Hello, World!"));
@@ -226,7 +240,7 @@ void test_prepare_message(){
 
     write_data_to_file("Hello, World!", "filesystems/client_fs/hi.txt");
     
-    char* buffer = malloc(sizeof(char) * MAX_COMMAND_SIZE);
+    char* buffer = calloc(MAX_COMMAND_SIZE, sizeof(char));
     prepare_message(buffer,"WRITE hi.txt server_hi.txt");
     assert(string_equal(buffer, "WRITE server_hi.txt Hello, World!"));
     memset(buffer, '\0', MAX_COMMAND_SIZE);
@@ -307,7 +321,7 @@ void test_remote_write(char* localText, char* localFile , char* remoteFile){
     char* actualLocalFP = get_actual_fp(localFile, 0);
     write_data_to_file(localText, actualLocalFP);
 
-    char* command = malloc(sizeof(char) * MAX_COMMAND_SIZE);
+    char* command = calloc(MAX_COMMAND_SIZE, sizeof(char));
 
     snprintf(command, MAX_COMMAND_SIZE, "WRITE %s %s", localFile, passedRemoteFile);
 
@@ -315,7 +329,7 @@ void test_remote_write(char* localText, char* localFile , char* remoteFile){
 
 
     FILE* file = fopen(get_actual_fp(remoteFile, 1), "r");
-    char* file_data = malloc(sizeof(char) * MAX_FILE_SIZE);
+    char* file_data = calloc(MAX_FILE_SIZE, sizeof(char));
     fread(file_data, sizeof(char),MAX_FILE_SIZE, file);
     fclose(file);
     assert(string_equal(file_data, localText));
@@ -339,14 +353,14 @@ void test_remote_get(char* remoteText, char* remoteFile, char* localFile){
 
     write_data_to_file(remoteText, get_actual_fp(remoteFile, 1));
 
-    char* command = malloc(sizeof(char) * MAX_COMMAND_SIZE);
+    char* command = calloc(MAX_COMMAND_SIZE, sizeof(char));
 
     snprintf(command, MAX_COMMAND_SIZE, "GET %s %s", remoteFile, passedLocalFile);
 
     assert(run_client(command) == 0);
 
     FILE* file = fopen(get_actual_fp(localFile, 0), "r");
-    char* file_data = malloc(sizeof(char) * MAX_FILE_SIZE);
+    char* file_data = calloc(MAX_FILE_SIZE, sizeof(char));
     fread(file_data, sizeof(char),MAX_FILE_SIZE, file);
     fclose(file);
     assert(string_equal(file_data, remoteText));
@@ -369,11 +383,20 @@ void test_remote_delete(){
 
 
 void test_server(){
+
+
+
+
     clear_filesystems();
+
+
+
+
+
 
     // tests that the client can execute commands on the server
     printf("Testing server . . .\n");
-
+    
 
     pid_t parent_pid = getpid();
     int pid = fork();
@@ -408,6 +431,21 @@ void test_server(){
     test_remote_write("Hello, Jim_missing_remote!", "v1/jim.txt", NULL);
 
 
+    char* large_buffer = calloc(MAX_FILE_SIZE, sizeof(char));
+
+    for (int i = 0; i < MAX_FILE_SIZE; i++){
+        large_buffer[i] = 'a' + (i % 26);
+
+        if (i == MAX_FILE_SIZE - 1){
+            large_buffer[i] = '\0';
+        }
+
+    }
+
+    test_remote_write(large_buffer, "large.txt", "server_large.txt"); // writing large amount of datat to server
+
+
+
     test_remote_get("Hello, World!", "server_hi.txt", "client_hi.txt");
 
     test_remote_get("Hello, Jim!", "/jims_files/v1/jim.txt", "client_jim.txt");
@@ -416,6 +454,9 @@ void test_server(){
 
     test_remote_get("Hello, Jim!\n Hello Bob!", "/jims_files/v1/jim.txt", "client_jim.txt"); // testing read with 2 lines
  
+
+
+
 
     clear_filesystems(); // clear filesystems before running tests
 
@@ -490,7 +531,7 @@ void test_concurrency(){
         if (pids[i] == 0){
             // child process
 
-            char* command = malloc(sizeof(char) * MAX_COMMAND_SIZE);
+            char* command = calloc(MAX_COMMAND_SIZE, sizeof(char));
             snprintf(command, MAX_COMMAND_SIZE, "WRITE hi.txt server_hi_%d.txt", i);
 
             if (run_client(command) != 0){
@@ -545,16 +586,16 @@ void test_concurrency(){
     for (int i = 0; i < num_processes; i++){
 
 
-        char* remoteFileName = malloc(sizeof(char) * MAX_COMMAND_SIZE);
+        char* remoteFileName = calloc(MAX_COMMAND_SIZE, sizeof(char));
         snprintf(remoteFileName, MAX_COMMAND_SIZE, "server_hi_%d.txt", i);
 
         FILE* remoteFile = fopen(get_actual_fp(remoteFileName, 1), "r");
-        char* remoteFileData = malloc(sizeof(char) * MAX_FILE_SIZE);
+        char* remoteFileData = calloc(MAX_FILE_SIZE, sizeof(char));
         fread(remoteFileData, sizeof(char),MAX_FILE_SIZE, remoteFile);
         fclose(remoteFile);
 
         FILE* localFile = fopen("filesystems/client_fs/hi.txt", "r");
-        char* localFileData = malloc(sizeof(char) * MAX_FILE_SIZE);
+        char* localFileData = calloc(MAX_FILE_SIZE, sizeof(char));
 
         fread(localFileData, sizeof(char), MAX_FILE_SIZE, localFile);
 

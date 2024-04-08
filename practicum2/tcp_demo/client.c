@@ -50,14 +50,14 @@ int main(void)
   gets(client_message);
   
   // Send the message to server:
-  if(send(socket_desc, client_message, strlen(client_message), 0) < 0){
+  if(send_all(socket_desc, client_message, strlen(client_message)) < 0){
     printf("Unable to send message\n");
     close(socket_desc);
     return -1;
   }
   
   // Receive the server's response:
-  if(recv(socket_desc, server_message, sizeof(server_message), 0) < 0){
+  if(receive_all(socket_desc, server_message) < 0){
     printf("Error while receiving server's msg\n");
     close(socket_desc);
     return -1;

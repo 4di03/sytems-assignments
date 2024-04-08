@@ -13,7 +13,7 @@
 
 int main(int argc, char *argv[]) {
 
-    char* command = malloc(sizeof(char) * MAX_COMMAND_SIZE);
+    char* command = calloc(MAX_COMMAND_SIZE, sizeof(char));
     
     for (int i =1; i <argc; i++){
         strcat(command, argv[i]);

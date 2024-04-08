@@ -50,7 +50,7 @@ void prepare_message(char* buffer, char* tmp_message) {
     fread(fileData, sizeof(char), MAX_FILE_SIZE, actualFile);
 
     fclose(actualFile);
-    char* response = malloc(sizeof(char) * MAX_COMMAND_SIZE);
+    char* response = calloc(MAX_COMMAND_SIZE, sizeof(char));
 
     sprintf(response, "WRITE %s %s", remoteFilePath, fileData);
 
@@ -66,7 +66,7 @@ void prepare_message(char* buffer, char* tmp_message) {
       printf("Invalid use of GET, must provide remote file path.\n");
       exit(1);
     }
-    char* response = malloc(sizeof(char) * MAX_COMMAND_SIZE);
+    char* response = calloc( MAX_COMMAND_SIZE, sizeof(char) );
 
     sprintf(response, "GET %s", remoteFilePath);
     message = response;
@@ -145,7 +145,7 @@ void handle_response(char* server_message, char* client_message) {
 
     int i = 0;
     int j = 0;
-    char* buffer = malloc(sizeof(char) * MAX_FILE_SIZE);
+    char* buffer = calloc(MAX_FILE_SIZE, sizeof(char));
     while (server_message[i] != '\0') {
 
       if (startReading == 1) {
@@ -199,16 +199,16 @@ int run_client(char* raw_command) {
 
   int socket_desc;
   struct sockaddr_in server_addr;
-  char server_message[2000], raw_message[2000];
+  char server_message[MAX_COMMAND_SIZE], raw_message[MAX_COMMAND_SIZE];
 
   int state = 0;
 
-  char* client_message = malloc(sizeof(char) * MAX_COMMAND_SIZE);
+  char* client_message = calloc(MAX_COMMAND_SIZE, sizeof(char) );
 
   // Clean buffers:
   memset(server_message, '\0', sizeof(server_message));
   memset(raw_message, '\0', sizeof(raw_message));
-  memset(client_message, '\0', sizeof(client_message));
+  memset(client_message, '\0', MAX_COMMAND_SIZE*sizeof(char));
 
   // read message before making connection in case user wants to quit right
   // away Get input from the user:
@@ -277,18 +277,22 @@ int run_client(char* raw_command) {
 
   printf("[Client] Connected with server successfully\n");
 
+  int messageLen = MAX_COMMAND_SIZE * sizeof(char);
 
-  printf("[Client] Sending message: %s\n", client_message);
-
+  if (messageLen < 100){
+    printf("[Client] Sending message to server: %s\n", client_message);
+  } else{
+    printf("[Client] Sending message to server with length %d\n", messageLen);
+  }
   // Send the message to server:
-  if (send(socket_desc, client_message, strlen(client_message), 0) < 0) {
+  if (send_all(socket_desc, client_message, messageLen) < 0) {
     printf("Unable to send message\n");
     close(socket_desc);
     return -1;
   }
 
   // Receive the server's response:
-  if (recv(socket_desc, server_message, sizeof(server_message), 0) < 0) {
+  if (receive_all(socket_desc, server_message, messageLen) < 0) {
     printf("Error while receiving server's msg\n");
     close(socket_desc);
     return -1;

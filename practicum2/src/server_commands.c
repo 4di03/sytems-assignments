@@ -51,7 +51,7 @@ char* write_remote(char* fileData, char* remoteFilePath){
 
     write_data_to_file(fileData, fp);
 
-    char* out_message = malloc(sizeof(char) * MAX_COMMAND_SIZE);
+    char* out_message = calloc(MAX_COMMAND_SIZE, sizeof(char));
 
     sprintf(out_message, "File written successfully to %s!\n", remoteFilePath);
 
@@ -77,12 +77,12 @@ char* read_remote(char* remoteFilePath){
         return strdup("Error opening file!\n");
     }
 
-    char* file_data = malloc(sizeof(char) * MAX_FILE_SIZE);
+    char* file_data = calloc(MAX_FILE_SIZE, sizeof(char));
     fread(file_data, sizeof(char),MAX_FILE_SIZE, file);
 
     fclose(file);
 
-    char* response = malloc(sizeof(char) * MAX_FILE_SIZE + 20);
+    char* response = calloc(MAX_FILE_SIZE + 20, sizeof(char));
 
     sprintf(response, "File Data:\n%s", file_data);
     return response;
@@ -96,7 +96,12 @@ char* delete(char* remoteFilePath){
      * remoteFilePath (char*): path to remote file
     */
 
-    if (remove(get_actual_fp(remoteFilePath, 1)) != 0){
+    char* actualFp = get_actual_fp(remoteFilePath, 1);
+    int status = remove(actualFp);
+    free(actualFp);
+
+    if (status != 0){
+        
         return strdup("Error deleting file!\n");
     }
 
@@ -126,7 +131,7 @@ char* process_request(char* request){
 
         char* remoteFilePath = command_split[1];
 
-        char* remaining_data = malloc(sizeof(char) * MAX_FILE_SIZE);
+        char* remaining_data = calloc(MAX_FILE_SIZE, sizeof(char));
 
         int j = 2;
         while (command_split[j] != NULL){
@@ -187,12 +192,10 @@ int connect_to_client(int socket_desc){
 
 int run_server(){
 
-
   if (signal(SIGINT, sigint_handler) == SIG_ERR){
     printf("Error while setting signal handler\n");
     return -1;
   }
-
 
  int socket_desc;
  struct sockaddr_in server_addr;
@@ -221,7 +224,7 @@ int run_server(){
     return -1;
   }
   printf("[Server] Done with binding\n");
-     // Listen for clients:
+    // Listen for clients:
   if(listen(socket_desc, 1) < 0){
     printf("Error while listening\n");
     close(socket_desc);
@@ -230,19 +233,21 @@ int run_server(){
   
    
   int client_sock;
-  char client_message[MAX_COMMAND_SIZE];
+
+  long messageSize = MAX_COMMAND_SIZE * sizeof(char);
+
+  char* client_message = calloc(MAX_COMMAND_SIZE, sizeof(char));
 
   while (1){
 
   // clear the message buffer:
-  memset(client_message, '\0', sizeof(client_message));
+  memset(client_message, '\0', messageSize);
 
 
   // Accept incoming client connection
   client_sock = connect_to_client(socket_desc);
   // Receive client's message:
-  if (recv(client_sock, client_message, 
-           sizeof(client_message), 0) < 0){
+  if (receive_all(client_sock, client_message, messageSize) < 0){
     printf("[Server] Couldn't receive\n");
     close(client_sock);
     continue; // does not close the server
@@ -252,9 +257,13 @@ int run_server(){
     printf("[Server] Client message is NULL\n");
     close(client_sock);
     continue; // does not close the server
+  } 
+
+  if (strlen(client_message) < 100){
+    printf("[Server] received message from client: %s\n", client_message);
+
   }
 
-  printf("[Server] Recieved message from client: %s\n", client_message);
 
   if (string_equal(client_message, "exit\n") || string_equal(client_message, "exit")){
     break;
@@ -263,7 +272,7 @@ int run_server(){
   // Process the request:
   char* server_message = process_request(client_message);
   
-  if (send(client_sock, server_message, strlen(server_message), 0) < 0){
+  if (send_all(client_sock, server_message, MAX_COMMAND_SIZE * sizeof(char)) < 0){
     printf("[Server] Can't send\n");
     close(client_sock);
     continue; // does not close the server

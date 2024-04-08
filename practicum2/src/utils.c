@@ -6,10 +6,93 @@
 #include <sys/stat.h>
 #include <libgen.h>
 #include "utils.h"
+#include <sys/socket.h>
+#include <errno.h>
+#include <unistd.h>
+
+int min(int a, int b){
+  /**
+   * Returns the minimum of two integers.
+   * 
+   * Args:
+   * a (int): first integer
+   * b (int): second integer
+   * 
+   * returns:
+   * int: minimum of a and b
+  */
+  return a < b ? a : b;
+}
+
+long send_all(int s, char *buf, long len)
+{
+  /**
+   * Sends all data from buffer through socker.
+   * 
+   * returns
+   * numbero f bytes on success, -1 on failure
+  */
+     //FROM https://stackoverflow.com/questions/33646539/should-send-and-recv-buffer-size-be-as-big-as-possible
+    long total = 0;        // how many bytes we've sent
+    int n;
+
+    int iter = 0;
+
+    while(total < len) {
+        n = send(s, buf+total, min(4096, len - total), 0);
+        if (n == -1) { break; }
+        total += n;
 
 
+        if (iter++ % 100 == 0){
+            printf("Sent %ld bytes\n", total);
+        }
+
+    }
+
+    printf("Total sent %ld bytes\n", total);
+
+    if (n == -1 || total < len) {
+        printf("Have %ld bytes left to send\n", len - total);
+        return -1; // return -1 on failure, 0 on success
+    }else{
+        return total;
+    }
+} 
 
 
+long receive_all(int s, char *buf, long len) {
+    /**
+     * Receives all data into buffer from socket.
+     * 
+     * returns
+     * 0 on success, -1 on failure
+    */
+    long total = 0; // how many bytes we've received
+    int n;
+    int iter = 0;
+    int chunkSize = 4096;
+
+    while (total < len){ // while the read amount of data is smaller than teh chunk size
+        n = recv(s, buf + total, chunkSize, 0); 
+
+        if (n <= 0 ){
+            printf("Error receiving data: %s\n", strerror(errno));
+            return -1;
+        }
+
+        total += n;
+
+        if(iter++ % 100 == 0){
+        printf("Received %ld bytes\n", total);
+        }
+    } // if n is equal to the chunk size, it means there is more data to be read
+
+    printf("Total recieved %ld bytes\n", total);
+
+
+    return (total > 0) ? total : -1; // return -1 on failure, 0 on success
+}
 void generate_random_file(char* filePath, int size){
   /**
    * Generate a text file with random alphanumeric characters  at the specified file path.
@@ -88,7 +171,7 @@ char* get_actual_fp(char* filePath, int remote){
 
     char* fs_loc = remote ? "server_fs" : "client_fs";
 
-    char* remote_fp = malloc(sizeof(char) * 1024);
+    char* remote_fp = calloc(1024, sizeof(char));
     sprintf(remote_fp, "filesystems/%s/%s", fs_loc ,filePath);
     return remote_fp;
 
@@ -102,7 +185,7 @@ char** split_str(char* str, char* delim){
     */
 
     char* strCopy = strdup(str); // copy the string to avoid modifying the original
-    char** result = malloc(sizeof(char*) * 10);
+    char** result = calloc(10, sizeof(char*));
     char* token = strtok(strCopy, delim);
     int i = 0;
     while(token != NULL){

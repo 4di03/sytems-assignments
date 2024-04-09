@@ -650,10 +650,10 @@ void test_concurrency(){
 
 
 int main(){
-    // clear_filesystems();
-    // test_commands();    
-    // test_client_commands(); 
-    // test_server();
+    clear_filesystems();
+    test_commands();    
+    test_client_commands(); 
+    test_server();
     test_concurrency();
 
     return 0;

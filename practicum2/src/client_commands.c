@@ -20,7 +20,7 @@ void prepare_message(char* buffer, client_message* cm) {
 
   char* message;
   if (string_equal(cm->command, "WRITE")) {
-    ;
+
     // will be in form 'WRITE <local file path> <remote file path>'
     // missing remote file name defaults to local file name
     char* localFilePath = cm->localFilePath;
@@ -100,9 +100,11 @@ client_message* parse_message(char* message){
    * 
   */
 
-  strip_newline(message);
+  char* messageCopy = strdup(message);
 
-  char** message_split = split_str(message, " ");
+  strip_newline(messageCopy);
+
+  char** message_split = split_str(messageCopy, " ");
 
   if (message_split[0] == NULL){
     return NULL;
@@ -114,7 +116,7 @@ client_message* parse_message(char* message){
 
     cm->command = "WRITE";
     cm->localFilePath = message_split[1];
-    cm->remoteFilePath = (message_split[2] == "rw" ||  message_split[2] == "ro") ?  NULL : message_split[2];
+    cm->remoteFilePath = (string_equal(message_split[2], "rw" )||  string_equal(message_split[2] , "ro")) ?  NULL : message_split[2];
     cm->permissions = cm->remoteFilePath == NULL ? message_split[2] : message_split[3];
 
   } else if (string_equal(message_split[0], "GET")){
@@ -142,6 +144,11 @@ client_message* parse_message(char* message){
     return NULL;
   }
 
+  if (cm->remoteFilePath == NULL && cm->localFilePath == NULL){
+    printf("[Client] Invalid command\n");
+    return NULL;
+  }
+
   return cm;
 
 
@@ -158,7 +165,7 @@ int validate_message(char* message) {
 
 }
 
-void handle_response(char* server_message, char* client_message) {
+int handle_response(char* server_message, char* client_message) {
   /**
    * Given the raw message inputted by user and the servers response , handles
    * the response.
@@ -167,6 +174,8 @@ void handle_response(char* server_message, char* client_message) {
    * server_message (char*): message from server
    * client_message (char*): message from client (this is the raw message,
    * prepare_message should not have been called on it)
+   * 
+   * returns 0 if successful, 1 otherwise
    */
   char** command_split = split_str(client_message, " ");
 
@@ -180,12 +189,20 @@ void handle_response(char* server_message, char* client_message) {
            localFilePath, remoteFilePath);
 
     printf("[Client] Server Response: %s\n", server_message);
+
+    if (! string_equal(server_message, "File written successfully!\n")){
+      printf("[Client] Error writing file to remote location\n");
+      return 1;
+    }
+
+
   } else if (string_equal(command_split[0], "GET")) {
 
     if(string_equal(server_message, "Error opening file!\n")){
       printf("[Client] File not found at remote location\n");
-      return;
-    }
+
+      return 1;
+    } 
 
     int startReading = 0;
     char* remoteFilePath = command_split[1];
@@ -223,6 +240,8 @@ void handle_response(char* server_message, char* client_message) {
     printf("[Client] File from remote (%s) written to %s\n", remoteFilePath,
            localFilePath);
 
+    return 0;
+
   } else if (string_equal(command_split[0], "RM")) {
 
     printf("[Client] Attempted to remove file at remote location : %s\n",
@@ -230,11 +249,20 @@ void handle_response(char* server_message, char* client_message) {
 
     printf("[Client] Server Response: %s\n", server_message);
 
+    return !(string_equal(server_message, "File deleted successfully!\n"));
+
+  }else if (string_equal(command_split[0], "LS")){
+    printf("[Client] Server Response: %s\n", server_message);
+
+    return 1;
+
   } else {
     printf("[Client] Invalid command\n");
+    return 1;
   }
 
   free(command_split);
+  return 0;
 }
 
 int run_client(char* raw_command) {
@@ -283,7 +311,7 @@ int run_client(char* raw_command) {
   }
 
 
-  prepare_message(client_message, raw_message); // put the client message there
+  prepare_message(client_message, parse_message(raw_message)); // put the client message there
 
   if (string_equal(client_message, "")) {
     printf("[Client] Message could not be prepared!\n");
@@ -365,7 +393,7 @@ int run_client(char* raw_command) {
   printf("[Client %d] Recieved server's response!\n", getpid());
 
 
-  handle_response(server_message, raw_message);
+  int return_code = handle_response(server_message, raw_message);
 
   if (DEBUG){
   printf("[Client] exiting program!\n");
@@ -373,5 +401,5 @@ int run_client(char* raw_command) {
   // Close the socket:
   close(socket_desc);
 
-  return 0;
+  return return_code;
 }

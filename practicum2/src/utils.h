@@ -37,3 +37,4 @@ char* get_value_from_dict(dict* d, char* key);
 void update_dict(dict* d, char* key, char* value);
 
 void remove_key_from_dict(dict* d, char* key);
+int key_in_dict(dict* d, char* key);

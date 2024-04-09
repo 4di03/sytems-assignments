@@ -16,3 +16,4 @@ char* process_request(char* request);
 
 
 int run_server();
+void init_metadata();

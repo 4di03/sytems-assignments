@@ -19,6 +19,9 @@ void clear_filesystems(){
     */
     system("rm -rf filesystems/*;mkdir filesystems/server_fs;mkdir filesystems/client_fs;");
     // using system call just for simplicity, in an actual application, we would use the C standard library to interact with the filesystem.
+
+    init_metadata(); // reinitalize metatada
+
 }
 
 
@@ -160,10 +163,10 @@ void test_write_data_to_file(){
 }
 
 void test_dict(){
-    print("Testing dictionary . . .\n");
+    printf("Testing dictionary . . .\n");
 
     dict* d = calloc(1, sizeof(dict));
-    d->size = 10;
+    d->size = 5;
     d->keys = calloc(d->size, sizeof(char*));
     d->values = calloc(d->size, sizeof(char*));
 
@@ -213,7 +216,7 @@ void test_dict(){
 
     fclose(file);
 
-    assert(string_equal(file_data, "hi.txt,ro\nhello.txt,rw\n"));
+    assert(string_equal(file_data, "hello.txt,rw\nhi.txt,ro\n"));
 
     free(file_data);
     file_data = NULL;
@@ -260,6 +263,17 @@ void test_utils(){
     assert(string_equal(command_split[1], "hi.txt"));
     assert(command_split[2] == NULL);
 
+    free(command_split);
+
+    char** command_split2 = split_str("WRITE v1/jim.txt  rw", " ");
+
+    assert(string_equal(command_split2[0], "WRITE"));
+    assert(string_equal(command_split2[1], "v1/jim.txt"));
+    assert(string_equal(command_split2[2], "rw"));
+    assert(command_split2[3] == NULL);
+
+    free(command_split2);
+
 
     test_write_data_to_file();
 
@@ -271,6 +285,8 @@ void test_utils(){
 void test_process_request(){
     // test process_request
     clear_filesystems();
+
+    init_metadata();
 
 
     char* response;
@@ -328,6 +344,32 @@ void test_process_request(){
     assert(string_equal(response, "File Data:\nHello!"));
 
 
+    clear_filesystems();
+
+    write_data_to_file("Hello, World!", "filesystems/client_fs/hi.txt");
+
+    process_request("WRITE server_hi.txt ro ello mate!");
+
+    assert(fileExists("filesystems/server_fs/server_hi.txt"));  
+
+    response = process_request("LS server_hi.txt");
+    assert(string_equal(response, "Permissions for file server_hi.txt: Read-Only\n"));
+
+    // test file perm stuff
+
+    clear_filesystems();
+
+    write_data_to_file("Hello, World!", "filesystems/client_fs/hi.txt");
+
+    write_data_to_file("overwrite", "filesystems/client_fs/x.txt");
+
+
+    assert(string_equal(process_request("WRITE server_hi.txt ro Hello, World!") , "File written successfully!\n"));
+
+    assert(string_equal(process_request("WRITE server_hi.txt rw overwrite"), "File is read only. Cannot write to it!\n")); // should fail since file is read-only
+
+    
+
 
 
 
@@ -370,27 +412,37 @@ void test_prepare_message(){
     write_data_to_file("Hello, World!", "filesystems/client_fs/hi.txt");
     
     char* buffer = calloc(MAX_COMMAND_SIZE, sizeof(char));
-    prepare_message(buffer,"WRITE hi.txt server_hi.txt ro");
+    prepare_message(buffer, parse_message("WRITE hi.txt server_hi.txt ro"));
     assert(string_equal(buffer, "WRITE server_hi.txt ro Hello, World!"));
     memset(buffer, '\0', MAX_COMMAND_SIZE);
 
-    prepare_message(buffer, "GET server_hi.txt client_hi.txt");
+    prepare_message(buffer, parse_message("GET server_hi.txt client_hi.txt"));
     assert(string_equal(buffer, "GET server_hi.txt"));
     memset(buffer, '\0', MAX_COMMAND_SIZE);
 
-    prepare_message(buffer, "RM server_hi.txt");
+    prepare_message(buffer, parse_message("RM server_hi.txt"));
     assert(string_equal(buffer, "RM server_hi.txt"));
     memset(buffer, '\0', MAX_COMMAND_SIZE);
 
 
 
-    prepare_message(buffer, "GET hi.txt\n");
+    prepare_message(buffer, parse_message("GET hi.txt\n"));
     assert(string_equal(buffer, "GET hi.txt"));
     memset(buffer, '\0', MAX_COMMAND_SIZE);
 
-    prepare_message(buffer, "RM hi.txt\n");
+    prepare_message(buffer, parse_message("RM hi.txt\n"));
     assert(string_equal(buffer, "RM hi.txt"));
     memset(buffer, '\0', MAX_COMMAND_SIZE);
+
+
+    write_data_to_file("Hello, Jim!", "filesystems/client_fs/v1/jim.txt");
+
+    client_message* pm = parse_message("WRITE v1/jim.txt  rw");
+    prepare_message(buffer,pm);
+    assert(string_equal(buffer, "WRITE v1/jim.txt rw Hello, Jim!"));
+    memset(buffer, '\0', MAX_COMMAND_SIZE);
+
+
 
 }
 
@@ -415,9 +467,20 @@ void test_validate_message(){
     assert(validate_message("rf\ns WRITE hi.txt server_hi.txt") == 0);
 }
 
+
+void test_parse_message(){
+
+    client_message* pm = parse_message("WRITE v1/jim.txt  rw");
+    assert(string_equal(pm->command, "WRITE"));
+    assert(string_equal(pm->localFilePath, "v1/jim.txt"));
+    assert(pm->remoteFilePath == NULL);
+    assert(string_equal(pm->permissions, "rw"));
+
+}
 void test_client_commands(){
     printf("Testing client commands . . .\n");
     clear_filesystems();
+    test_parse_message();
     test_prepare_message();
 
     test_validate_message();
@@ -501,6 +564,97 @@ void test_remote_delete(){
     assert(!fileExists("filesystems/server_fs/server_hi.txt"));
 }
 
+void test_remote_file_perms(){
+    // tests that the remote file permissions is functional
+
+    clear_filesystems();
+
+    write_data_to_file("Hello, World!", "filesystems/client_fs/hi.txt");
+
+    write_data_to_file("overwrite", "filesystems/client_fs/x.txt");
+
+    assert(run_client("WRITE hi.txt server_hi.txt ro") == 0);
+
+    metadata = load_dict_from_file(get_actual_fp(".metadata",1)); // refresh metadata
+
+    assert(string_equal(get_value_from_dict(metadata, "server_hi.txt") , "ro")); // check that metadata is stored
+
+
+    assert(run_client("WRITE x.txt server_hi.txt rw") == 1); // should fail since file is read-only
+
+    FILE* file0 = fopen(get_actual_fp("server_hi.txt", 1), "r");
+    char* file_data0 = calloc(MAX_FILE_SIZE, sizeof(char));
+    fread(file_data0, sizeof(char),MAX_FILE_SIZE, file0);
+    fclose(file0);
+    assert(string_equal(file_data0, "Hello, World!")); // making sure data was not overwritten
+    free(file_data0);
+    metadata = load_dict_from_file(get_actual_fp(".metadata",1)); // refresh metadata
+
+    assert(string_equal(get_value_from_dict(metadata, "server_hi.txt") ,"ro")); // check that metadata is stored
+
+    assert(run_client("RM server_hi.txt") == 1); // should fail since file is read-only
+
+
+    metadata = load_dict_from_file(get_actual_fp(".metadata",1)); // refresh metadata
+
+    assert(string_equal(get_value_from_dict(metadata, "server_hi.txt"), "ro")); // check that metadata is stored
+
+    assert(fileExists("filesystems/server_fs/server_hi.txt") == 1);
+
+    assert(run_client("GET server_hi.txt client_hi.txt") == 0);
+
+    FILE* file = fopen(get_actual_fp("client_hi.txt", 0), "r");
+    char* file_data = calloc(MAX_FILE_SIZE, sizeof(char));
+    fread(file_data, sizeof(char),MAX_FILE_SIZE, file);
+    fclose(file);
+    assert(string_equal(file_data, "Hello, World!")); // just making sure metadata is not stored in the file
+    free(file_data);
+
+    metadata = load_dict_from_file(get_actual_fp(".metadata",1)); // refresh metadata
+
+    assert(string_equal(get_value_from_dict(metadata, "server_hi.txt") , "ro")); // check that metadat is stored
+
+    clear_filesystems();
+
+    write_data_to_file("Hello, World!", "filesystems/client_fs/hi.txt");
+
+    write_data_to_file("overwrite", "filesystems/client_fs/x.txt");
+
+    assert(run_client("WRITE hi.txt server_hi.txt rw") == 0);
+
+    metadata = load_dict_from_file(get_actual_fp(".metadata",1)); // refresh metadata
+
+    assert(string_equal(get_value_from_dict(metadata, "server_hi.txt"), "rw")); // check that metadat is stored
+
+    assert(run_client("WRITE x.txt server_hi.txt ro") == 0); // should  succeed
+
+    FILE* file2 = fopen(get_actual_fp("server_hi.txt", 1), "r");
+    char* file_data2 = calloc(MAX_FILE_SIZE, sizeof(char));
+    fread(file_data2, sizeof(char),MAX_FILE_SIZE, file2);
+    fclose(file2);
+    assert(string_equal(file_data2, "overwrite")); // making sure data was overwritten
+    free(file_data2);
+
+    metadata = load_dict_from_file(get_actual_fp(".metadata",1)); // refresh metadata
+
+    assert(string_equal(get_value_from_dict(metadata, "server_hi.txt"), "rw")); // check that metadat is stored
+
+    assert(run_client("GET server_hi.txt client_hi.txt") == 0);
+
+    assert(run_client("RM server_hi.txt") == 0); // should succeed since file is read-write
+
+    assert(!fileExists("filesystems/server_fs/server_hi.txt"));
+
+    metadata = load_dict_from_file(get_actual_fp(".metadata",1)); // refresh metadata
+
+    assert(get_value_from_dict(metadata, "server_hi.txt") == NULL); // check that metadata is removed
+
+    clear_filesystems();
+
+    
+
+}
+
 
 void test_server(){
 
@@ -530,6 +684,7 @@ void test_server(){
     }else{
     sleep(1); // wait for server to start
 
+    test_remote_file_perms();
 
     test_remote_delete();
 
@@ -553,7 +708,7 @@ void test_server(){
 
     }
 
-    test_remote_write(large_buffer, "large.txt", "server_large.txt"); // writing large amount of datat to server
+    test_remote_write(large_buffer, "large.txt", "server_large.txt", "rw"); // writing large amount of datat to server
 
 
 

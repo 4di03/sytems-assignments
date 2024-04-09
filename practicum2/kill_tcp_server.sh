@@ -1,1 +1,4 @@
-nc -l -p 2000 & sleep 1 && lsof -ti:2000 | xargs kill -9
+ps -a | grep 'server' | awk '{print $1}' | xargs kill -TERM 
+# kill server with sigint
+
+kill -9 $(lsof -t -i:2000 -sTCP:LISTEN)

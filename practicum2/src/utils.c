@@ -167,6 +167,11 @@ int string_equal(char* str1, char* str2){
    * returns:
    *  1 if strings are equal, 0 otherwise
   */
+
+  if (str1 == NULL || str2 == NULL){
+    return 0; // always false for null pointers
+  }
+
   int i = 0;
   while (str1[i] != '\0' && str2[i] != '\0'){
     if (str1[i] != str2[i]){
@@ -288,6 +293,8 @@ void dict_to_file(dict* d, char* filePath){
      * filePath (char*): path to file
     */
 
+   
+
     FILE* file = fopen(filePath, "w");
 
     if (file == NULL){
@@ -396,11 +403,24 @@ void update_dict(dict* d, char* key, char* value){
      * char*: success message
     */
 
+    int latestNullIndex = -1;
+
     for (int i = 0; i < d->size; i++){
         if (d->keys[i] == NULL){
-            d->keys[i] = key;
+            latestNullIndex = i;
+        } else if (string_equal(d->keys[i], key)){
             d->values[i] = value;
+            return;
         }
+    }
+
+    // if key not found, add it to the dictionary
+    if (latestNullIndex == -1){
+        printf("Dictionary full!\n");
+        return;
+    }else{
+        d->keys[latestNullIndex] = key;
+        d->values[latestNullIndex] = value;
     }
 }
 
@@ -436,11 +456,5 @@ int key_in_dict(dict* d, char* key){
      * int: 1 if key is in dictionary, 0 otherwise
     */
 
-    for (int i = 0; i < d->size; i++){
-        if (d->keys[i] != NULL && string_equal(d->keys[i], key)){
-            return 1;
-        }
-    }
-
-    return 0;
+    return get_value_from_dict(d, key) != NULL;
 }

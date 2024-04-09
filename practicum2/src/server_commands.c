@@ -32,7 +32,26 @@ void sigint_handler(int signum){
    * Kills the socket listener at port 2000
   */
   printf("Ctrl+C (SIGINT) received. Exiting...\n");
+
+
   system("sh kill_tcp_server.sh"); // kills socket listener at port 2000
+
+
+
+  exit(signum);
+}
+
+
+void sigterm_handler(int signum){
+  /**
+   * Signal handler for SIGTERM
+   * 
+   * Kills the socket listener at port 2000
+  */
+  printf("SIGTERM received, saving metadata and closing server...\n");
+
+  // Save metadata to file
+  dict_to_file(metadata, get_actual_fp(".metadata", 1));
 
   exit(signum);
 }
@@ -126,6 +145,23 @@ char* delete(char* remoteFilePath){
 }
 
 
+void save_metadata(){
+    for( int i = 0; i< metadata->size; i++){
+      if (metadata->keys[i] != NULL && !fileExists(get_actual_fp(metadata->keys[i],1))){
+        metadata->keys[i] = NULL;
+        metadata->values[i] = NULL;
+        // get rid of thsi data
+      }
+    }
+
+    pthread_mutex_lock(&fileAccessMutex); // lock file access
+    
+    dict_to_file(metadata, get_actual_fp(".metadata", 1));
+
+    pthread_mutex_unlock(&fileAccessMutex); // unlock file access
+  
+}
+
 char* handle_write_request(char** command_split){
     /**
      * Handle WRITE request from client.
@@ -158,7 +194,8 @@ char* handle_write_request(char** command_split){
           }
       }
 
-      if (prevPerms != NULL){ // we only update the first time
+      if (prevPerms == NULL){ // we only update the first time
+      printf("[Server] Updating metadata for file %s\n", remoteFilePath);
       update_dict(metadata, remoteFilePath, permissions); // update metadata dictionary
       }
       return write_remote(remaining_data, remoteFilePath);
@@ -191,7 +228,9 @@ char* handle_delete_request(char** command_split){
 
     char* remoteFilePath = command_split[1];
 
-    if (string_equals(get_value_from_dict(metadata, remoteFilePath), "ro")){
+    char* prevPerms = get_value_from_dict(metadata, remoteFilePath);
+
+    if (prevPerms!= NULL && string_equal(prevPerms, "ro")){
         return strdup("File is read-only , cannot delete!\n");
     }
 
@@ -214,7 +253,7 @@ char* handle_ls_request(char** command_split){
 
   char* response = calloc(MAX_COMMAND_SIZE, sizeof(char));
 
-  char* permString = string_equals(permissions, "ro") ? "Read-Only" : "Read-Write";
+  char* permString = string_equal(permissions, "ro") ? "Read-Only" : "Read-Write";
 
   sprintf(response, "Permissions for file %s: %s\n", remoteFilePath, permString);
 
@@ -235,6 +274,9 @@ char* process_request(char* request){
      * 
      * RESPONSE MUST BE FREED AFTER USE
     */
+
+
+    save_metadata();
 
     strip_newline(request);
 
@@ -259,6 +301,9 @@ char* process_request(char* request){
     } else {
         msg = strdup("Invalid command! The command after should be one of WRITE, GET, or RM\n");
     }
+
+    save_metadata();
+
 
     char* retBuffer = calloc(MAX_COMMAND_SIZE, sizeof(char));
     snprintf(retBuffer, strlen(msg) + 1, "%s", msg);
@@ -418,7 +463,7 @@ int findNextAvaliableIndex(pthread_t** threads){
 }
 
 
-void init_metadtata(){
+void init_metadata(){
   /**
    * Initializes the metadata dictionary.
   */
@@ -438,13 +483,29 @@ void init_metadtata(){
 }
 
 
+
+void* store_metadata(){
+  /**
+   * Periodically saves the metadata dictionary to file.
+  */
+
+  while (1){
+    if (DEBUG){
+    printf("[Server] Saving metadata to file\n");
+    } 
+    save_metadata();
+    sleep(1);
+
+  }
+}
+
 int run_server(){
   /**
    * Runs the server.
   */  
 
   // Initialize metadata dictionary
-  init_metadtata();
+  init_metadata();
   //initalize mutex
 
    if (pthread_mutex_init(&fileAccessMutex, NULL) != 0) {
@@ -454,6 +515,11 @@ int run_server(){
 
 
   if (signal(SIGINT, sigint_handler) == SIG_ERR){
+    printf("Error while setting signal handler\n");
+    return -1;
+  }
+
+  if(signal(SIGTERM, sigterm_handler) == SIG_ERR){
     printf("Error while setting signal handler\n");
     return -1;
   }
@@ -502,6 +568,15 @@ int run_server(){
     printf("Error while creating cleanup thread\n");
     return -1;
   } // start thread to clean up finished threads and clear out the threads array
+
+  // start thread to save metadata every second
+
+  pthread_t* metadata_thread = calloc(1,sizeof(pthread_t)); 
+  if(pthread_create(metadata_thread, NULL, store_metadata, NULL) != 0){
+    printf("Error while creating metadata thread\n");
+    return -1;
+  } // start thread to save metadata every second
+
   int nextAvailableIndex;
   while (1){
 
@@ -535,10 +610,13 @@ int run_server(){
 
   } // when the client doesnt send the exit message. 
 
-  printf("[Server] Closing the server\n");
+  printf("[Server] Closing the server, saving metadta\n");
   close(socket_desc);
   pthread_cancel(*cleanup_thread); // cancel the cleanup thread
 
+  // Save metadata to file
+
+  save_metadata();
   return 0;
 
 }

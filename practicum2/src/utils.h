@@ -1,4 +1,4 @@
-int fileExists(const char *path);
+int fileExists(const char* path);
 
 int string_equal(char* str1, char* str2);
 
@@ -11,24 +11,22 @@ int directory_exists(char* dirPath);
 
 void make_parent_dirs(char* filePath);
 
-
 char* write_data_to_file(char* fileData, char* filePath);
 
 void generate_random_file(char* filePath, int size);
 
-long send_all(int s, char *buf, long len);
+long send_all(int s, char* buf, long len);
 long receive_all(int s, char* buffer, long len);
 
 // dictionary data structure + functions
 
-typedef struct dict{
-    int size; // size of dictionary
-    char** keys; // array of keys
-    char** values; // array of values
+typedef struct dict {
+  int size;      // size of dictionary
+  char** keys;   // array of keys
+  char** values; // array of values
 } dict;
 
 void dict_to_file(dict* d, char* filePath);
-
 
 dict* load_dict_from_file(char* filePath);
 

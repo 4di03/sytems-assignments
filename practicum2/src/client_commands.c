@@ -1,3 +1,4 @@
+#include "client_commands.h"
 #include "constants.h"
 #include "utils.h"
 #include <arpa/inet.h>
@@ -6,10 +7,6 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include "client_commands.h"
-
-
-
 
 void prepare_message(char* buffer, client_message* cm) {
   /**
@@ -24,7 +21,8 @@ void prepare_message(char* buffer, client_message* cm) {
     // will be in form 'WRITE <local file path> <remote file path>'
     // missing remote file name defaults to local file name
     char* localFilePath = cm->localFilePath;
-    char* remoteFilePath = cm->remoteFilePath == NULL ? localFilePath : cm->remoteFilePath;
+    char* remoteFilePath =
+        cm->remoteFilePath == NULL ? localFilePath : cm->remoteFilePath;
 
     char* actualFilePath = get_actual_fp(localFilePath, 0);
 
@@ -41,7 +39,8 @@ void prepare_message(char* buffer, client_message* cm) {
     fclose(actualFile);
     char* response = calloc(MAX_COMMAND_SIZE, sizeof(char));
 
-    sprintf(response, "WRITE %s %s %s", remoteFilePath, cm->permissions, fileData);
+    sprintf(response, "WRITE %s %s %s", remoteFilePath, cm->permissions,
+            fileData);
 
     free(fileData);
     message = response;
@@ -51,7 +50,7 @@ void prepare_message(char* buffer, client_message* cm) {
 
     char* remoteFilePath = cm->remoteFilePath;
 
-    char* response = calloc( MAX_COMMAND_SIZE, sizeof(char) );
+    char* response = calloc(MAX_COMMAND_SIZE, sizeof(char));
 
     sprintf(response, "GET %s", remoteFilePath);
     message = response;
@@ -59,7 +58,7 @@ void prepare_message(char* buffer, client_message* cm) {
     // will be in form 'RM <remote file path>'
     char* remoteFilePath = cm->remoteFilePath;
 
-    char* response = calloc( MAX_COMMAND_SIZE, sizeof(char) );
+    char* response = calloc(MAX_COMMAND_SIZE, sizeof(char));
 
     sprintf(response, "RM %s", remoteFilePath);
     message = response;
@@ -67,38 +66,45 @@ void prepare_message(char* buffer, client_message* cm) {
     // will be in form 'LS <remote file path>'
     char* remoteFilePath = cm->remoteFilePath;
 
-    char* response = calloc( MAX_COMMAND_SIZE, sizeof(char) );
+    char* response = calloc(MAX_COMMAND_SIZE, sizeof(char));
 
     sprintf(response, "LS %s", remoteFilePath);
+    message = response;
+  }  else if (string_equal(cm->command, "STOP")) {
+    // will be in form 'STOP'
+    char* response = calloc(MAX_COMMAND_SIZE, sizeof(char));
+
+    sprintf(response, "STOP");
     message = response;
   } else {
     printf("[Client] Invalid command\n");
     return;
-  }
-  
+  } 
 
   snprintf(buffer, MAX_COMMAND_SIZE, "%s", message); // secure copy
 }
 
-client_message* parse_message(char* message){
+client_message* parse_message(char* message) {
   /**
    * Parses the message given by the user.
-   * 
+   *
    * the message will be in one of the forms:
-   * 
+   *
    * WRITE <local file path> <remote file path> <permissions>
-   * 
+   *
    * <permissions> is one of 'rw' or 'ro'
-   * 
-   * remote path is optional, check to see if the 2nd field is == 'rw' or 'ro' to determine if remote path is present
-   * 
+   *
+   * remote path is optional, check to see if the 2nd field is == 'rw' or 'ro'
+   * to determine if remote path is present
+   *
    * GET <remote file path> <local file path>
-   * 
-   * local path is optional, check to see if the 2nd field is not NULl to determine if local path is present
-   * 
+   *
+   * local path is optional, check to see if the 2nd field is not NULl to
+   * determine if local path is present
+   *
    * RM <remote file path>
-   * 
-  */
+   *
+   */
 
   char* messageCopy = strdup(message);
 
@@ -106,52 +112,57 @@ client_message* parse_message(char* message){
 
   char** message_split = split_str(messageCopy, " ");
 
-  if (message_split[0] == NULL){
+  if (message_split[0] == NULL) {
     return NULL;
   }
 
   client_message* cm = calloc(1, sizeof(client_message));
 
-  if (string_equal(message_split[0], "WRITE")){
+  if (string_equal(message_split[0], "WRITE")) {
 
     cm->command = "WRITE";
     cm->localFilePath = message_split[1];
-    cm->remoteFilePath = (string_equal(message_split[2], "rw" )||  string_equal(message_split[2] , "ro")) ?  NULL : message_split[2];
-    cm->permissions = cm->remoteFilePath == NULL ? message_split[2] : message_split[3];
+    cm->remoteFilePath = (string_equal(message_split[2], "rw") ||
+                          string_equal(message_split[2], "ro"))
+                             ? NULL
+                             : message_split[2];
+    cm->permissions =
+        cm->remoteFilePath == NULL ? message_split[2] : message_split[3];
 
-  } else if (string_equal(message_split[0], "GET")){
+  } else if (string_equal(message_split[0], "GET")) {
 
     cm->command = "GET";
     cm->remoteFilePath = message_split[1];
-    cm->localFilePath = message_split[2] == NULL ? message_split[1] : message_split[2];
+    cm->localFilePath =
+        message_split[2] == NULL ? message_split[1] : message_split[2];
 
-  } else if (string_equal(message_split[0], "RM")){
+  } else if (string_equal(message_split[0], "RM")) {
 
     cm->command = "RM";
     cm->remoteFilePath = message_split[1];
 
-  } else if (string_equal(message_split[0], "LS")){
+  } else if (string_equal(message_split[0], "LS")) {
 
     // LS <remote file path>
 
     cm->command = "LS";
     cm->remoteFilePath = message_split[1];
 
-    
+  } else if (string_equal(message_split[0], "STOP")) {
+    cm->command = "STOP";
 
   } else {
     printf("[Client] Invalid command\n");
     return NULL;
   }
 
-  if (cm->remoteFilePath == NULL && cm->localFilePath == NULL){
+  if (cm->remoteFilePath == NULL && cm->localFilePath == NULL &&
+      !string_equal(cm->command, "STOP")) {
     printf("[Client] Invalid command\n");
     return NULL;
   }
 
   return cm;
-
-
 }
 
 int validate_message(char* message) {
@@ -162,7 +173,6 @@ int validate_message(char* message) {
    *  1 if message is valid, 0 otherwise
    */
   return parse_message(message) != NULL;
-
 }
 
 int handle_response(char* server_message, char* client_message) {
@@ -174,35 +184,34 @@ int handle_response(char* server_message, char* client_message) {
    * server_message (char*): message from server
    * client_message (char*): message from client (this is the raw message,
    * prepare_message should not have been called on it)
-   * 
+   *
    * returns 0 if successful, 1 otherwise
    */
   char** command_split = split_str(client_message, " ");
 
-
   if (string_equal(command_split[0], "WRITE")) {
 
     char* localFilePath = command_split[1];
-    char* remoteFilePath = command_split[2] == NULL ? localFilePath : command_split[2];
+    char* remoteFilePath =
+        command_split[2] == NULL ? localFilePath : command_split[2];
 
     printf("[Client] Attempted to write %s to remote location : %s\n",
            localFilePath, remoteFilePath);
 
     printf("[Client] Server Response: %s\n", server_message);
 
-    if (! string_equal(server_message, "File written successfully!\n")){
+    if (!string_equal(server_message, "File written successfully!\n")) {
       printf("[Client] Error writing file to remote location\n");
       return 1;
     }
 
-
   } else if (string_equal(command_split[0], "GET")) {
 
-    if(string_equal(server_message, "Error opening file!\n")){
+    if (string_equal(server_message, "Error opening file!\n")) {
       printf("[Client] File not found at remote location\n");
 
       return 1;
-    } 
+    }
 
     int startReading = 0;
     char* remoteFilePath = command_split[1];
@@ -251,7 +260,7 @@ int handle_response(char* server_message, char* client_message) {
 
     return !(string_equal(server_message, "File deleted successfully!\n"));
 
-  }else if (string_equal(command_split[0], "LS")){
+  } else if (string_equal(command_split[0], "LS")) {
     printf("[Client] Server Response: %s\n", server_message);
 
     return 1;
@@ -286,12 +295,12 @@ int run_client(char* raw_command) {
 
   int state = 0;
 
-  char* client_message = calloc(MAX_COMMAND_SIZE, sizeof(char) );
+  char* client_message = calloc(MAX_COMMAND_SIZE, sizeof(char));
 
   // Clean buffers:
   memset(server_message, '\0', sizeof(server_message));
   memset(raw_message, '\0', sizeof(raw_message));
-  memset(client_message, '\0', MAX_COMMAND_SIZE*sizeof(char));
+  memset(client_message, '\0', MAX_COMMAND_SIZE * sizeof(char));
 
   // read message before making connection in case user wants to quit right
   // away Get input from the user:
@@ -310,15 +319,13 @@ int run_client(char* raw_command) {
     return 1;
   }
 
-
-  prepare_message(client_message, parse_message(raw_message)); // put the client message there
+  prepare_message(client_message,
+                  parse_message(raw_message)); // put the client message there
 
   if (string_equal(client_message, "")) {
     printf("[Client] Message could not be prepared!\n");
     return 1;
   }
-
-
 
   // Send connection request to server:
   int retries = 0;
@@ -335,17 +342,16 @@ int run_client(char* raw_command) {
       return -1;
     }
 
-    if (DEBUG){
-    printf("[Client] Socket created successfully\n");
+    if (DEBUG) {
+      printf("[Client] Socket created successfully\n");
     }
     // Set port and IP the same as server-side:
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(2000);
     server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-
-    if (DEBUG){
-    printf("[Client] Attempt Number: %d\n", retries);
+    if (DEBUG) {
+      printf("[Client] Attempt Number: %d\n", retries);
     }
     if (connect(socket_desc, (struct sockaddr*)&server_addr,
                 sizeof(server_addr)) < 0) {
@@ -366,10 +372,12 @@ int run_client(char* raw_command) {
 
   int messageLen = MAX_COMMAND_SIZE * sizeof(char);
 
-  if (messageLen < 100){
-    printf("[Client %d] Sending message to server: %s\n",getpid(), client_message);
-  } else{
-    printf("[Client %d] Sending message to server with length %d\n",getpid(), messageLen);
+  if (messageLen < 100) {
+    printf("[Client %d] Sending message to server: %s\n", getpid(),
+           client_message);
+  } else {
+    printf("[Client %d] Sending message to server with length %d\n", getpid(),
+           messageLen);
   }
   // Send the message to server:
   if (send_all(socket_desc, client_message, messageLen) < 0) {
@@ -377,10 +385,8 @@ int run_client(char* raw_command) {
     close(socket_desc);
     return -1;
   }
-  
+
   printf("[Client %d] Sent message to server!\n", getpid());
-
-
 
   printf("[Client %d] Waiting to receive server's response . . .\n", getpid());
   // Receive the server's response if the message is not exit
@@ -392,11 +398,10 @@ int run_client(char* raw_command) {
 
   printf("[Client %d] Recieved server's response!\n", getpid());
 
-
   int return_code = handle_response(server_message, raw_message);
 
-  if (DEBUG){
-  printf("[Client] exiting program!\n");
+  if (DEBUG) {
+    printf("[Client] exiting program!\n");
   }
   // Close the socket:
   close(socket_desc);

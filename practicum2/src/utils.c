@@ -93,6 +93,7 @@ long receive_all(int s, char *buf, long len) {
         n = recv(s, buf + total, chunkSize, 0); 
 
         if (n <= 0 ){
+          
             printf("Error receiving data: %s\n", strerror(errno));
             return -1;
         }

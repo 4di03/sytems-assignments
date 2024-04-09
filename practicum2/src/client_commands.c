@@ -254,14 +254,18 @@ int run_client(char* raw_command) {
       return -1;
     }
 
+    if (DEBUG){
     printf("[Client] Socket created successfully\n");
-
+    }
     // Set port and IP the same as server-side:
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(2000);
     server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
+
+    if (DEBUG){
     printf("[Client] Attempt Number: %d\n", retries);
+    }
     if (connect(socket_desc, (struct sockaddr*)&server_addr,
                 sizeof(server_addr)) < 0) {
       printf("Unable to connect, retrying . . .\n");
@@ -282,9 +286,9 @@ int run_client(char* raw_command) {
   int messageLen = MAX_COMMAND_SIZE * sizeof(char);
 
   if (messageLen < 100){
-    printf("[Client] Sending message to server: %s\n", client_message);
+    printf("[Client %d] Sending message to server: %s\n",getpid(), client_message);
   } else{
-    printf("[Client] Sending message to server with length %d\n", messageLen);
+    printf("[Client %d] Sending message to server with length %d\n",getpid(), messageLen);
   }
   // Send the message to server:
   if (send_all(socket_desc, client_message, messageLen) < 0) {
@@ -293,9 +297,12 @@ int run_client(char* raw_command) {
     return -1;
   }
   
+  printf("[Client %d] Sent message to server!\n", getpid());
+
   if (! string_equal(client_message, "exit")) {
 
 
+  printf("[Client %d] Waiting to receive server's response . . .\n", getpid());
   // Receive the server's response if the message is not exit
   if (receive_all(socket_desc, server_message, messageLen) < 0) {
     printf("Error while receiving server's msg\n");
@@ -303,12 +310,15 @@ int run_client(char* raw_command) {
     return -1;
   }
 
+  printf("[Client %d] Recieved server's response!\n", getpid());
+
+
   handle_response(server_message, raw_message);
 
   }
-
+  if (DEBUG){
   printf("[Client] exiting program!\n");
-
+  }
   // Close the socket:
   close(socket_desc);
 

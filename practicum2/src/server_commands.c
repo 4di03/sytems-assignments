@@ -204,9 +204,9 @@ int connect_to_client(int socket_desc){
     close(client_sock);
     return -1;
   }
-  printf("[Server] Client connected at IP: %s and port: %i\n", 
+  printf("[Server] Client connected at IP: %s and port: %i with socket id: %d\n", 
          inet_ntoa(client_addr.sin_addr), 
-         ntohs(client_addr.sin_port));
+         ntohs(client_addr.sin_port), client_sock);
 
   return client_sock;
 }
@@ -225,13 +225,16 @@ void* serve_client(void* data){
   char* client_message = calloc(MAX_COMMAND_SIZE, sizeof(char));
   long messageSize = MAX_COMMAND_SIZE * sizeof(char);
 
-  
+  printf("[Server] Waiting to receive client %d's message . . .\n", client_sock);
+
   // Receive client's message:
   if (receive_all(client_sock, client_message, messageSize) < 0){
     printf("[Server] Couldn't receive\n");
     close(client_sock);
     return NULL;
   }
+
+  printf("[Server] Received message from client %d\n", client_sock);
 
   if (client_message == NULL){
     printf("[Server] Client message is NULL\n");
@@ -256,11 +259,15 @@ void* serve_client(void* data){
   // Process the request:
   char* server_message = process_request(client_message);
 
+  printf("[Server] Sending respone to client %d  . . .\n", client_sock);
+
   if (send_all(client_sock, server_message, MAX_COMMAND_SIZE * sizeof(char)) < 0){
     printf("[Server] Can't send\n");
     close(client_sock);
     return NULL;
   }
+
+  printf("[Server] Sent response to client %d\n", client_sock);
 
   // Closing the socket:
   close(client_sock);
@@ -270,16 +277,20 @@ void* serve_client(void* data){
 }
 
 
-pthread_t* spawn_worker_thread(int client_sock){
+pthread_t* spawn_worker_thread(int* client_sock_ptr){
   /**
    * Spawns a worker thread to handle a specific client connection.
   */
+
   pthread_t* th1 = calloc(1, sizeof(pthread_t));
 
-  if(pthread_create(th1, NULL, serve_client, &client_sock) != 0){
+  printf("[Server] Spawning worker thread to handle client %d\n", *client_sock_ptr);
+  if(pthread_create(th1, NULL, serve_client, client_sock_ptr) != 0){
     printf("[Server] Error while creating thread\n");
     exit(1);
   }
+
+  
 
   return th1;
 }
@@ -337,13 +348,7 @@ int run_server(){
    * Runs the server.
   */
 
-
    if (pthread_mutex_init(&fileAccessMutex, NULL) != 0) {
-    perror("pthread_mutex_init");
-    exit(1);
-  }
-
-  if (pthread_mutex_init(&socketMutex, NULL) != 0) {
     perror("pthread_mutex_init");
     exit(1);
   }
@@ -368,8 +373,10 @@ int run_server(){
     printf("Error while creating socket\n");
     return -1;
   }
+
+  if (DEBUG){
   printf("[Server] Socket created successfully\n");
-  
+  }
   // Set port and IP:
   server_addr.sin_family = AF_INET;
   server_addr.sin_port = htons(2000);
@@ -388,7 +395,6 @@ int run_server(){
     return -1;
   }
   
-  int client_sock;
 
   pthread_t** threads = calloc(MAX_WORKERS , sizeof(pthread_t*)); // array to store worker threads
  
@@ -401,7 +407,7 @@ int run_server(){
   while (1){
 
   // Accept incoming client connection
-  client_sock = connect_to_client(socket_desc);
+  int client_sock = connect_to_client(socket_desc); // reinitalize int for each client so we don't share
   // parent thread is responsible for accepting incoming connections and spawning threads to handle them
 
   nextAvailableIndex = findNextAvaliableIndex(threads);
@@ -409,8 +415,23 @@ int run_server(){
     nextAvailableIndex = findNextAvaliableIndex(threads); // keep checking until a thread is available
   }
 
+  // Create a separate socket descriptor for each thread
+  int* client_sock_ptr = malloc(sizeof(int)); // Allocate memory for the socket descriptor
+  if (client_sock_ptr == NULL) {
+      fprintf(stderr, "Error: Failed to allocate memory for client_sock_ptr\n");
+      close(client_sock); // Close the socket descriptor to prevent resource leaks
+      continue; // Skip to the next iteration of the loop
+  }
+  *client_sock_ptr = client_sock; // Store the socket descriptor in dynamically allocated memory
 
-  pthread_t* client_thread = spawn_worker_thread(client_sock);
+  /**
+   * Why this works:
+   * 
+   * Thread Doesn't Access Pointer After Scope Ends: The thread doesn't need to access client_sock_ptr itself; 
+   * it only needs the socket descriptor it points to. Therefore, even though client_sock_ptr goes out of scope,
+   * it doesn't affect the validity of the socket descriptor passed to the thread.
+  */
+  pthread_t* client_thread = spawn_worker_thread(client_sock_ptr);
   threads[nextAvailableIndex] = client_thread;
 
   } // when the client doesnt send the exit message. 

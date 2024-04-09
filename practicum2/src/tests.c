@@ -11,6 +11,8 @@
 #include <string.h>
 #include <pthread.h>
 
+extern dict* metadata; // metadata dictionary from "server_commands.c"
+
 void clear_filesystems(){
     /**
      * Helper to clear filesystems before running tests.
@@ -18,16 +20,7 @@ void clear_filesystems(){
     system("rm -rf filesystems/*;mkdir filesystems/server_fs;mkdir filesystems/client_fs;");
     // using system call just for simplicity, in an actual application, we would use the C standard library to interact with the filesystem.
 }
-int fileExists(const char *path) {
-    // Check if the file exists
-    if (access(path, F_OK) != -1) {
-        // File exists
-        return 1;
-    } else {
-        // File does not exist
-        return 0;
-    }
-}
+
 
 void test_write(){
     // test write
@@ -166,6 +159,90 @@ void test_write_data_to_file(){
     free(file_data2);
 }
 
+void test_dict(){
+    print("Testing dictionary . . .\n");
+
+    dict* d = calloc(1, sizeof(dict));
+    d->size = 10;
+    d->keys = calloc(d->size, sizeof(char*));
+    d->values = calloc(d->size, sizeof(char*));
+
+    //test key_in_dict
+
+    assert(!key_in_dict(d, "hi.txt"));
+
+    d->keys[0] = "hi.txt";
+    d->values[0] = "ro";
+
+    assert(key_in_dict(d, "hi.txt"));
+
+    assert(string_equal(get_value_from_dict(d, "hi.txt") , "ro"));
+
+    //clear dict
+    d->keys[0] = NULL;
+    d->values[0] = NULL;
+
+    //test update_dict
+
+    assert(!key_in_dict(d, "hi.txt"));
+
+    update_dict(d, "hi.txt", "ro");
+
+    assert(key_in_dict(d, "hi.txt"));
+
+    assert(string_equal(get_value_from_dict(d, "hi.txt"), "ro"));
+
+    //test remove_key_from_dict
+
+    remove_key_from_dict(d, "hi.txt");
+
+    assert(!key_in_dict(d, "hi.txt"));
+
+    //test save_dict_to_file
+
+    update_dict(d, "hi.txt", "ro");
+    update_dict(d, "hello.txt", "rw");
+
+    dict_to_file(d, "filesystems/server_fs/metadata.txt");
+
+    FILE* file = fopen("filesystems/server_fs/metadata.txt", "r");
+
+    char* file_data = calloc(MAX_FILE_SIZE, sizeof(char));
+
+    fread(file_data, sizeof(char), MAX_FILE_SIZE, file);
+
+    fclose(file);
+
+    assert(string_equal(file_data, "hi.txt,ro\nhello.txt,rw\n"));
+
+    free(file_data);
+    file_data = NULL;
+    //test load_dict_from_file
+
+    dict* d2 = load_dict_from_file("filesystems/server_fs/metadata.txt");
+
+    assert(key_in_dict(d2, "hi.txt"));
+    assert(key_in_dict(d2, "hello.txt"));
+
+    assert(string_equal(get_value_from_dict(d2, "hi.txt"), "ro"));
+    assert(string_equal(get_value_from_dict(d2, "hello.txt"), "rw"));
+
+    //test update_dict
+
+    update_dict(d2, "hi.txt", "rw");
+
+    assert(string_equal(get_value_from_dict(d2, "hi.txt"), "rw"));
+
+    //test remove_key_from_dict
+
+    remove_key_from_dict(d2, "hi.txt");
+
+    assert(!key_in_dict(d2, "hi.txt"));
+
+
+}
+
+
 void test_utils(){
 
     printf("Testing utils . . .\n");
@@ -185,6 +262,8 @@ void test_utils(){
 
 
     test_write_data_to_file();
+
+    test_dict();
 
 
 }
@@ -211,7 +290,7 @@ void test_process_request(){
     response = NULL;
 
 
-    response = process_request("WRITE server_hi.txt Hello, World!");
+    response = process_request("WRITE server_hi.txt rw Hello, World!");
 
     assert(string_equal(response, "File written successfully!\n"));
 
@@ -291,8 +370,8 @@ void test_prepare_message(){
     write_data_to_file("Hello, World!", "filesystems/client_fs/hi.txt");
     
     char* buffer = calloc(MAX_COMMAND_SIZE, sizeof(char));
-    prepare_message(buffer,"WRITE hi.txt server_hi.txt");
-    assert(string_equal(buffer, "WRITE server_hi.txt Hello, World!"));
+    prepare_message(buffer,"WRITE hi.txt server_hi.txt ro");
+    assert(string_equal(buffer, "WRITE server_hi.txt ro Hello, World!"));
     memset(buffer, '\0', MAX_COMMAND_SIZE);
 
     prepare_message(buffer, "GET server_hi.txt client_hi.txt");
@@ -303,14 +382,7 @@ void test_prepare_message(){
     assert(string_equal(buffer, "RM server_hi.txt"));
     memset(buffer, '\0', MAX_COMMAND_SIZE);
 
-    prepare_message(buffer,"exit");
-    assert(string_equal(buffer, "exit"));
-    memset(buffer, '\0', MAX_COMMAND_SIZE);
 
-
-    prepare_message(buffer, "exit\n");
-    assert(string_equal(buffer, "exit"));
-    memset(buffer, '\0', MAX_COMMAND_SIZE);
 
     prepare_message(buffer, "GET hi.txt\n");
     assert(string_equal(buffer, "GET hi.txt"));
@@ -324,13 +396,11 @@ void test_prepare_message(){
 
 
 void test_validate_message(){
-    assert(validate_message("WRITE hi.txt server_hi.txt\n") == 1);
+    assert(validate_message("WRITE hi.txt server_hi.txt ro\n") == 1);
     assert(validate_message("GET server_hi.txt client_hi.txt\n") == 1);
-    assert(validate_message("WRITE hi.txt\n") == 1);
+    assert(validate_message("WRITE hi.txt rw\n") == 1);
     assert(validate_message("GET server_hi.txt") == 1);
     assert(validate_message("RM server_hi.txt") == 1);
-    assert(validate_message("exit") == 1);
-    assert(validate_message("exit\n") == 1);
 
     assert(validate_message("RM priv/b.txt\n"));
 
@@ -356,7 +426,7 @@ void test_client_commands(){
 
 
 
-void test_remote_write(char* localText, char* localFile , char* remoteFile){
+void test_remote_write(char* localText, char* localFile , char* remoteFile, char* permissions){
     /**
      * Tests that teh local file at <localFile>  with data <localText> is properly written to the remote file at <remoteFile>.
     */
@@ -373,7 +443,7 @@ void test_remote_write(char* localText, char* localFile , char* remoteFile){
 
     char* command = calloc(MAX_COMMAND_SIZE, sizeof(char));
 
-    snprintf(command, MAX_COMMAND_SIZE, "WRITE %s %s", localFile, passedRemoteFile);
+    snprintf(command, MAX_COMMAND_SIZE, "WRITE %s %s %s", localFile, passedRemoteFile, permissions);
 
     assert(run_client(command) == 0);
 
@@ -434,9 +504,6 @@ void test_remote_delete(){
 
 void test_server(){
 
-
-
-
     clear_filesystems();
 
     // tests that the client can execute commands on the server
@@ -466,14 +533,13 @@ void test_server(){
 
     test_remote_delete();
 
-    test_remote_write("Hello, World!", "hi.txt", "server_hi.txt");
+    test_remote_write("Hello, World!", "hi.txt", "server_hi.txt", "rw");
 
+    test_remote_write("Hello, Jim", "v1/jim.txt", "/jims_files/v1/jim.txt", "ro"); 
 
-    test_remote_write("Hello, Jim", "v1/jim.txt", "/jims_files/v1/jim.txt"); 
+    test_remote_write("Hello, Jim\nHello Bob!", "v1/jim.txt", "/bobs_files/v1/jim.txt", "rw"); // testing case where there are 2 lines
 
-    test_remote_write("Hello, Jim\nHello Bob!", "v1/jim.txt", "/bobs_files/v1/jim.txt"); // testing case where there are 2 lines
-
-    test_remote_write("Hello, Jim_missing_remote!", "v1/jim.txt", NULL);
+    test_remote_write("Hello, Jim_missing_remote!", "v1/jim.txt", NULL, "rw"); // testing case where remote file is not provided
 
 
     char* large_buffer = calloc(MAX_FILE_SIZE, sizeof(char));
@@ -535,6 +601,23 @@ void test_server(){
 }
 
 
+void test_metadata(){
+    printf("Testing metadata . . .\n");
+
+    clear_filesystems();
+
+    assert(!key_in_dict(metadata, "hi.txt"));
+
+    process_request("WRITE hi.txt ro Hello, World!"); // write a read-only file
+
+    assert(key_in_dict(metadata, "hi.txt"));
+
+    assert(string_equal(get_value_from_dict(metadata, "hi.txt"), "ro"));
+
+
+}
+
+
 void test_concurrency(){
     clear_filesystems();
     printf("Testing server's ability to handle concurrent requests . . .\n");
@@ -575,7 +658,7 @@ void test_concurrency(){
             // child process
 
             char* command = calloc(MAX_COMMAND_SIZE, sizeof(char));
-            snprintf(command, MAX_COMMAND_SIZE, "WRITE hi.txt server_hi_%d.txt", i);
+            snprintf(command, MAX_COMMAND_SIZE, "WRITE hi.txt server_hi_%d.txt rw", i);
 
             if (run_client(command) != 0){
                 printf("Error running client\n");

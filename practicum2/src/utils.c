@@ -278,3 +278,169 @@ char* write_data_to_file(char* fileData, char* filePath){
 
     return "File written successfully!\n";
 }
+
+void dict_to_file(dict* d, char* filePath){
+    /**
+     * Write dictionary to file in csv format.
+     * 
+     * Args:
+     * d (dict*): dictionary to write to file
+     * filePath (char*): path to file
+    */
+
+    FILE* file = fopen(filePath, "w");
+
+    if (file == NULL){
+        printf("Error opening file!\n");
+        exit(1);
+    }
+
+    for (int i = 0; i < d->size; i++){
+
+      if (d->keys[i] != NULL && d->values[i] != NULL){
+        fprintf(file, "%s,%s\n", d->keys[i], d->values[i]);
+      }
+    }
+
+    fclose(file);
+
+}
+
+
+dict* load_dict_from_file(char* filePath){
+    /**
+     * Load dictionary from file.
+     * 
+     * Args:
+     * filePath (char*): path to file
+     * 
+     * returns:
+     * dict*: dictionary loaded from file
+    */
+
+    FILE* file = fopen(filePath, "r");
+
+    if (file == NULL){
+        printf("Error opening file!\n");
+        exit(1);
+    }
+
+    dict* d = calloc(1, sizeof(dict));
+    d->size = MAX_FILE_SIZE;
+    d->keys = calloc(d->size, sizeof(char*));
+    d->values = calloc(d->size, sizeof(char*));
+
+    char* line = NULL;
+    size_t len = 0;
+    ssize_t read;
+
+    int i = 0;
+    while ((read = getline(&line, &len, file)) != -1){
+        strip_newline(line);
+        char** parts = split_str(line, ",");
+        d->keys[i] = parts[0];
+        d->values[i] = parts[1];
+        i++;
+    }
+
+    fclose(file);
+
+    return d;
+
+
+
+}
+int fileExists(const char *path) {
+    // Check if the file exists
+    if (access(path, F_OK) != -1) {
+        // File exists
+        return 1;
+    } else {
+        // File does not exist
+        return 0;
+    }
+}
+
+char* get_value_from_dict(dict* d, char* key){
+    /**
+     * Get value from dictionary.
+     * 
+     * Args:
+     * d (dict*): dictionary
+     * key (char*): key to search for
+     * 
+     * returns:
+     * char*: value corresponding to key
+     * NULL if key not found
+    */
+
+    for (int i = 0; i < d->size; i++){
+        if (d->keys[i] != NULL && string_equal(d->keys[i], key)){
+            return d->values[i];
+        }
+    }
+
+    return NULL;
+}
+
+void update_dict(dict* d, char* key, char* value){
+    /**
+     * Update dictionary with key-value pair.
+     * 
+     * Args:
+     * d (dict*): dictionary
+     * key (char*): key to update
+     * value (char*): value to update
+     * 
+     * returns:
+     * char*: success message
+    */
+
+    for (int i = 0; i < d->size; i++){
+        if (d->keys[i] == NULL){
+            d->keys[i] = key;
+            d->values[i] = value;
+        }
+    }
+}
+
+void remove_key_from_dict(dict* d, char* key){
+    /**
+     * Remove key from dictionary.
+     * 
+     * Args:
+     * d (dict*): dictionary
+     * key (char*): key to remove
+     * 
+     * DOES NOT FREE VALUES. Since we store pointers , it is the responsibility of the caller to free the memory.
+    */
+
+    for (int i = 0; i < d->size; i++){
+        if (d->keys[i] != NULL && string_equal(d->keys[i], key)){
+
+            d->keys[i] = NULL;
+            d->values[i] = NULL;
+        }
+    }
+}
+
+int key_in_dict(dict* d, char* key){
+    /**
+     * Check if key is in dictionary.
+     * 
+     * Args:
+     * d (dict*): dictionary
+     * key (char*): key to search for
+     * 
+     * returns:
+     * int: 1 if key is in dictionary, 0 otherwise
+    */
+
+    for (int i = 0; i < d->size; i++){
+        if (d->keys[i] != NULL && string_equal(d->keys[i], key)){
+            return 1;
+        }
+    }
+
+    return 0;
+}

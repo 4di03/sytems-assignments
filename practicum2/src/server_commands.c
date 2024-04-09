@@ -23,6 +23,8 @@
 
 pthread_mutex_t fileAccessMutex;
 
+dict* metadata;
+
 void sigint_handler(int signum){
   /**
    * Signal handler for SIGINT (Ctrl+C)
@@ -123,6 +125,103 @@ char* delete(char* remoteFilePath){
     return strdup("File deleted successfully!\n");
 }
 
+
+char* handle_write_request(char** command_split){
+    /**
+     * Handle WRITE request from client.
+     * 
+     * message is of form WRITE <remote_file_path> <perms> <file_data>
+     * 
+     * args:
+     * command_split (char**): split command
+     * returns:
+     * char** : response message
+    */
+
+      char* remoteFilePath = command_split[1];
+
+      char* remaining_data = calloc(MAX_FILE_SIZE, sizeof(char));
+      char* permissions = command_split[2];
+
+      char* prevPerms = get_value_from_dict(metadata, remoteFilePath);
+
+      if(string_equal(prevPerms, "ro")){
+        return strdup("File is read only. Cannot write to it!\n");
+      }
+
+      int j = 3;
+      while (command_split[j] != NULL){
+          strcat(remaining_data, command_split[j]);
+          j++;
+          if (command_split[j] != NULL){
+              strcat(remaining_data, " "); // to prevent adding extra space at the end
+          }
+      }
+
+      if (prevPerms != NULL){ // we only update the first time
+      update_dict(metadata, remoteFilePath, permissions); // update metadata dictionary
+      }
+      return write_remote(remaining_data, remoteFilePath);
+}
+
+char* handle_get_request(char** command_split){
+    /**
+     * Handle GET request from client.
+     * 
+     * args:
+     * command_split (char**): split command
+     * returns:
+     * char** : response message
+    */
+
+    char* remoteFilePath = command_split[1];
+
+    return read_remote(remoteFilePath);
+}
+
+char* handle_delete_request(char** command_split){
+    /**
+     * Handle RM request from client.
+     * 
+     * args:
+     * command_split (char**): split command
+     * returns:
+     * char** : response message
+    */
+
+    char* remoteFilePath = command_split[1];
+
+    if (string_equals(get_value_from_dict(metadata, remoteFilePath), "ro")){
+        return strdup("File is read-only , cannot delete!\n");
+    }
+
+    return delete(remoteFilePath);
+}
+
+
+char* handle_ls_request(char** command_split){
+  /**
+   * Return response with permissions of file
+  */
+
+  char* remoteFilePath = command_split[1];
+
+  char* permissions = get_value_from_dict(metadata, remoteFilePath);
+
+  if (permissions == NULL){
+    return strdup("Metadata for file not found!\n");
+  }
+
+  char* response = calloc(MAX_COMMAND_SIZE, sizeof(char));
+
+  char* permString = string_equals(permissions, "ro") ? "Read-Only" : "Read-Write";
+
+  sprintf(response, "Permissions for file %s: %s\n", remoteFilePath, permString);
+
+  return response;
+
+}
+
 char* process_request(char* request){
     /**
      * Helper to process command from client on the serverside.
@@ -142,36 +241,21 @@ char* process_request(char* request){
     char** command_split = split_str(request, " ");
     char* msg;
 
-
-
     if (string_equal(command_split[0] , "WRITE")){
         // request should be in form WRITE <remote_file_path> <file_data>
-
-        char* remoteFilePath = command_split[1];
-
-        char* remaining_data = calloc(MAX_FILE_SIZE, sizeof(char));
-
-        int j = 2;
-        while (command_split[j] != NULL){
-            strcat(remaining_data, command_split[j]);
-            j++;
-            if (command_split[j] != NULL){
-                strcat(remaining_data, " "); // to prevent adding extra space at the end
-            }
-        }
-        
-        msg = write_remote(remaining_data, remoteFilePath);
+        msg = handle_write_request(command_split);
 
     }else if (string_equal(command_split[0], "GET")){
         // request should be in form GET <remote_file_path> 
-
-        msg = read_remote(command_split[1]);
+        msg = handle_get_request(command_split);
 
     } else if (string_equal(command_split[0] , "RM")){
         // request should be in form RM <remote_file_path> 
 
-        msg =  delete(command_split[1]);
+        msg =  handle_delete_request(command_split);
 
+    }else if (string_equal(command_split[0], "LS")){
+        msg = handle_ls_request(command_split);
     } else {
         msg = strdup("Invalid command! The command after should be one of WRITE, GET, or RM\n");
     }
@@ -218,8 +302,6 @@ void* serve_client(void* data){
    * Serves a client connection.
   */
 
-
-
   int client_sock = *((int*)data);
 
   char* client_message = calloc(MAX_COMMAND_SIZE, sizeof(char));
@@ -247,14 +329,8 @@ void* serve_client(void* data){
     printf("[Server] received message from client %d: %s\n", client_sock, client_message);
   } else{
     printf("[Server] received message from client %d with length %d\n", client_sock ,messageLen);
-
   }
 
-
-  if (string_equal(client_message, "exit\n") || string_equal(client_message, "exit")){
-    // does nothing in multithreaded server
-    return NULL;
-  }
 
   // Process the request:
   char* server_message = process_request(client_message);
@@ -342,11 +418,34 @@ int findNextAvaliableIndex(pthread_t** threads){
 }
 
 
+void init_metadtata(){
+  /**
+   * Initializes the metadata dictionary.
+  */
+
+  char* metadataFilePath = get_actual_fp(".metadata",1);
+
+  if (!fileExists(metadataFilePath)){
+  
+  metadata = malloc(sizeof(dict));
+  metadata->size = MAX_FILES;
+  metadata->keys = calloc(MAX_FILES, sizeof(char*));
+  metadata->values = calloc(MAX_FILES, sizeof(char*));
+  }else{
+    metadata = load_dict_from_file(metadataFilePath);
+  }
+
+}
+
 
 int run_server(){
   /**
    * Runs the server.
-  */
+  */  
+
+  // Initialize metadata dictionary
+  init_metadtata();
+  //initalize mutex
 
    if (pthread_mutex_init(&fileAccessMutex, NULL) != 0) {
     perror("pthread_mutex_init");

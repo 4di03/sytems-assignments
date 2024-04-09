@@ -1,3 +1,4 @@
+int fileExists(const char *path);
 
 int string_equal(char* str1, char* str2);
 
@@ -17,3 +18,22 @@ void generate_random_file(char* filePath, int size);
 
 long send_all(int s, char *buf, long len);
 long receive_all(int s, char* buffer, long len);
+
+// dictionary data structure + functions
+
+typedef struct dict{
+    int size; // size of dictionary
+    char** keys; // array of keys
+    char** values; // array of values
+} dict;
+
+void dict_to_file(dict* d, char* filePath);
+
+
+dict* load_dict_from_file(char* filePath);
+
+char* get_value_from_dict(dict* d, char* key);
+
+void update_dict(dict* d, char* key, char* value);
+
+void remove_key_from_dict(dict* d, char* key);

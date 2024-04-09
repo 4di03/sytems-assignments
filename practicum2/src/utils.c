@@ -29,6 +29,12 @@ long send_all(int s, char *buf, long len)
   /**
    * Sends all data from buffer through socker.
    * 
+   * args:
+   * s (int): socket file descriptor
+   * buf (char*): buffer to send
+   * len (long): length of buffer
+   * 
+   * 
    * returns
    * numbero f bytes on success, -1 on failure
   */
@@ -40,7 +46,11 @@ long send_all(int s, char *buf, long len)
 
     while(total < len) {
         n = send(s, buf+total, min(4096, len - total), 0);
-        if (n == -1) { break; }
+        if (n == -1) { 
+          printf("Error sending data: %s\n", strerror(errno));
+          break; 
+          
+          }
         total += n;
 
 
@@ -65,6 +75,11 @@ long send_all(int s, char *buf, long len)
 long receive_all(int s, char *buf, long len) {
     /**
      * Receives all data into buffer from socket.
+     * 
+     * args:
+     * s (int): socket file descriptor
+     * buf (char*): buffer to receive data into
+     * len (long): length of buffer
      * 
      * returns
      * 0 on success, -1 on failure

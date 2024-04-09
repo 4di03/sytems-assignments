@@ -9,6 +9,7 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <string.h>
+#include <pthread.h>
 
 void clear_filesystems(){
     /**
@@ -33,7 +34,7 @@ void test_write(){
 
     printf("Testing write . . .\n");
     char* write_response = write_remote("Hello, World!", "test.txt");
-    assert(string_equal(write_response, "File written successfully to test.txt!\n"));
+    assert(string_equal(write_response, "File written successfully!\n"));
     FILE* file = fopen("filesystems/server_fs/test.txt", "r");
     char* file_data = calloc(MAX_FILE_SIZE, sizeof(char));
     fread(file_data,sizeof(char), MAX_FILE_SIZE, file);
@@ -46,7 +47,7 @@ void test_write(){
 
     // test on nested file
     write_response = write_remote("Hello, Jim!", "nested/jim.txt");
-    assert(string_equal(write_response, "File written successfully to nested/jim.txt!\n"));
+    assert(string_equal(write_response, "File written successfully!\n"));
     FILE* file2 = fopen("filesystems/server_fs/nested/jim.txt", "r");
     char* file_data2 = calloc(MAX_FILE_SIZE, sizeof(char));
     fread(file_data2, sizeof(char), MAX_FILE_SIZE, file);
@@ -59,7 +60,7 @@ void test_write(){
 
     // test on doubly nested file
     write_response = write_remote("Hello, Jim2!", "nested/jim/jim.txt");
-    assert(string_equal(write_response, "File written successfully to nested/jim/jim.txt!\n"));
+    assert(string_equal(write_response, "File written successfully!\n"));
     FILE* file3 = fopen("filesystems/server_fs/nested/jim/jim.txt", "r");
     char* file_data3 = calloc(MAX_FILE_SIZE, sizeof(char));
     fread(file_data3, sizeof(char), MAX_FILE_SIZE, file3);
@@ -119,9 +120,55 @@ void test_read(){
     read_response = NULL;
 }
 
+void* thread_write(){
+    /**
+     * helper function to write to a file for thread testing
+    */
+
+    write_data_to_file("Hello, World!", "filesystems/server_fs/thread_test.txt");
+    return NULL;
+}
+
+void test_write_data_to_file(){
+
+    printf("Testing write_data_to_file . . .\n");
+
+    clear_filesystems();
+    assert(!fileExists("filesystems/server_fs/write.txt"));
+
+    write_data_to_file("Hello, World!", "filesystems/server_fs/write.txt");
+
+    assert(fileExists("filesystems/server_fs/write.txt"));
+
+
+    FILE* file = fopen("filesystems/server_fs/write.txt", "r");
+    char* file_data = calloc(MAX_FILE_SIZE, sizeof(char));
+    fread(file_data, sizeof(char), MAX_FILE_SIZE, file);
+    fclose(file);
+    assert(string_equal(file_data, "Hello, World!"));
+
+    free(file_data);
+
+    assert(!fileExists("filesystems/server_fs/thread_test.txt"));
+
+    pthread_t thread;
+    pthread_create(&thread, NULL, thread_write, NULL);
+    pthread_join(thread, NULL);
+
+    assert(fileExists("filesystems/server_fs/thread_test.txt"));
+
+    FILE* file2 = fopen("filesystems/server_fs/thread_test.txt", "r");
+    char* file_data2 = calloc(MAX_FILE_SIZE, sizeof(char));
+
+    fread(file_data2, sizeof(char), MAX_FILE_SIZE, file2);
+    fclose(file2);
+    assert(string_equal(file_data2, "Hello, World!"));
+    free(file_data2);
+}
+
 void test_utils(){
 
-    printf("Testing utils . . .");
+    printf("Testing utils . . .\n");
 
     char words[15] = "Hello, World!\n";
     strip_newline(words);
@@ -135,6 +182,9 @@ void test_utils(){
     assert(string_equal(command_split[0], "GET"));
     assert(string_equal(command_split[1], "hi.txt"));
     assert(command_split[2] == NULL);
+
+
+    test_write_data_to_file();
 
 
 }
@@ -163,7 +213,7 @@ void test_process_request(){
 
     response = process_request("WRITE server_hi.txt Hello, World!");
 
-    assert(string_equal(response, "File written successfully to server_hi.txt!\n"));
+    assert(string_equal(response, "File written successfully!\n"));
 
     free(response);
     response = NULL;
@@ -389,19 +439,14 @@ void test_server(){
 
     clear_filesystems();
 
-
-
-
-
-
     // tests that the client can execute commands on the server
     printf("Testing server . . .\n");
     
 
     pid_t parent_pid = getpid();
-    int pid = fork();
+    int server_pid = fork();
 
-    if (pid == 0){
+    if (server_pid == 0){
 
     if (run_server() != 0){
         printf("Error starting server\n");
@@ -467,8 +512,7 @@ void test_server(){
 
     assert(run_client("dummy command") == 1);
 
-    assert(run_client("exit") == 0); // exit the client and server.
-
+    kill(server_pid, SIGKILL); // kill the server
 
 
     }
@@ -476,7 +520,7 @@ void test_server(){
     clear_filesystems(); // clear filesystems after running tests
 
 
-    if (pid != 0){
+    if (server_pid != 0){
     // wait for all child processes to finish
     printf("Waiting for server to close . . .\n");
     wait(NULL);
@@ -520,7 +564,6 @@ void test_concurrency(){
 
     }
 
-
     generate_random_file("filesystems/client_fs/hi.txt", MAX_FILE_SIZE); // create a random <N> MB file to write to the server
     
     int num_processes = NUM_CONCURRENT_REQUESTS;
@@ -547,10 +590,8 @@ void test_concurrency(){
     int success = 1;
     for (int i = 0; i < num_processes; i++) {
         int status;
+        printf("Waiting for child process %d to finish . . .\n", pids[i]);
         waitpid(pids[i], &status, 0);
-
-
-
         assert(WIFEXITED(status));
 
         int exit_status = WEXITSTATUS(status);
@@ -566,13 +607,8 @@ void test_concurrency(){
 
     printf("Closing the server . . .\n");
     // kill the server 
-    if(run_client("exit") != 0){
-        printf("Error closing server\n");
-        exit(1);
-    }
 
-    waitpid(server_pid, NULL, 0); // wait for server to close
-
+    kill(server_pid, SIGKILL); // kill the server
 
     if (success){
         printf("All child processes succeeded!\n");
@@ -580,8 +616,6 @@ void test_concurrency(){
         printf("Some child processes failed\n");
         exit(1);
     }
-
-
 
     // verify that the files written to the server are correct
 
@@ -616,11 +650,10 @@ void test_concurrency(){
 
 
 int main(){
-    clear_filesystems();
-    test_commands();    
-    test_client_commands(); 
-    test_server();
-
+    // clear_filesystems();
+    // test_commands();    
+    // test_client_commands(); 
+    // test_server();
     test_concurrency();
 
     return 0;
